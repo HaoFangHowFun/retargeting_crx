@@ -4,6 +4,7 @@ input_device: quest3
 world_to_robot:
   # Tune this fixed Quest WebXR-local to robot-world orientation in simulation
   # before connecting hardware. Relative alignment below offsets position only.
-  rotation_euler_xyz_deg: [90, 0, -90]
+  # Current CRX+LEAP test setup; previous Panda setup used [90, 0, -90].
+  rotation_euler_xyz_deg: [90, 0, 0]
   translation: [0, 0, 0]
 use_relative_wrist_alignment: true

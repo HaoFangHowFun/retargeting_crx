@@ -1,0 +1,989 @@
+<?xml version='1.0' encoding='utf-8'?>
+<robot name="crx5ia_leap_paxini">
+  <link name="world" />
+  <link name="ee_mount" />
+  <link name="base_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="../meshes/crx5ia/visual/base.dae" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="../meshes/crx5ia/collision/base.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="2.695" />
+      <origin xyz="-0.02329 -0.00113 0.04668" />
+      <inertia ixx="0.004082061" ixy="0.000281666" ixz="0.001055913" iyy="0.008721822" iyz="4.52295E-05" izz="0.009813918" />
+    </inertial>
+  </link>
+  <link name="J1_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 -0.185" />
+      <geometry>
+        <mesh filename="../meshes/crx5ia/visual/j1.dae" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="0 0 -1.5707963267948966" xyz="0 0 -0.185" />
+      <geometry>
+        <mesh filename="../meshes/crx5ia/collision/j1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="5.173" />
+      <origin xyz="-0.00223 -0.04084 -0.03" />
+      <inertia ixx="0.027098156" ixy="-0.000166078" ixz="-0.000127776" iyy="0.015731396" iyz="-0.005631899" izz="0.0195838" />
+    </inertial>
+  </link>
+  <link name="J2_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="-0.0 0 -0.185" />
+      <geometry>
+        <mesh filename="../meshes/crx5ia/visual/j2.dae" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="0 0 -1.5707963267948966" xyz="-0.0 0 -0.185" />
+      <geometry>
+        <mesh filename="../meshes/crx5ia/collision/j2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="5.014" />
+      <origin xyz="0.00013 -0.14378 0.18566" />
+      <inertia ixx="0.183168026" ixy="-3.67741E-05" ixz="0.000192371" iyy="0.178671177" iyz="0.01360861" izz="0.013395386" />
+    </inertial>
+  </link>
+  <link name="J3_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="-0.0 0 -0.595" />
+      <geometry>
+        <mesh filename="../meshes/crx5ia/visual/j3.dae" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="0 0 -1.5707963267948966" xyz="-0.0 0 -0.595" />
+      <geometry>
+        <mesh filename="../meshes/crx5ia/collision/j3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="3.133" />
+      <origin xyz="0.0303 -0.01286 -0.0002" />
+      <inertia ixx="0.005769799" ixy="0.001344252" ixz="1.14634E-05" iyy="0.008568956" iyz="1.8629E-06" izz="0.009083218" />
+    </inertial>
+  </link>
+  <link name="J4_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="-0.0 0 -0.595" />
+      <geometry>
+        <mesh filename="../meshes/crx5ia/visual/j4.dae" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="0 0 -1.5707963267948966" xyz="-0.0 0 -0.595" />
+      <geometry>
+        <mesh filename="../meshes/crx5ia/collision/j4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="3.508" />
+      <origin xyz="0.28287 0.00109 0.00019" />
+      <inertia ixx="0.003276324" ixy="-0.00164576" ixz="-1.35414E-05" iyy="0.053727933" iyz="-4.1252E-06" izz="0.053791595" />
+    </inertial>
+  </link>
+  <link name="J5_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="-0.43 0 -0.595" />
+      <geometry>
+        <mesh filename="../meshes/crx5ia/visual/j5.dae" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="0 0 -1.5707963267948966" xyz="-0.43 0 -0.595" />
+      <geometry>
+        <mesh filename="../meshes/crx5ia/collision/j5.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="2.434" />
+      <origin xyz="0.01442 -0.09491 0.00164" />
+      <inertia ixx="0.006167974" ixy="-0.001284188" ixz="-2.28931E-05" iyy="0.003922645" iyz="-0.00029073" izz="0.007292078" />
+    </inertial>
+  </link>
+  <link name="J6_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="-0.43 0.13 -0.595" />
+      <geometry>
+        <mesh filename="../meshes/crx5ia/visual/j6.dae" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="../meshes/crx5ia/collision/j6.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="1.272" />
+      <origin xyz="0.10028 0.00052 0.00002" />
+      <inertia ixx="0.00143989" ixy="1.06324E-05" ixz="-7.92E-08" iyy="0.001354656" iyz="-2.602E-07" izz="0.001399779" />
+    </inertial>
+  </link>
+  <joint name="J1" type="revolute">
+    <origin rpy="0 0 0" xyz="0 0 0.185" />
+    <parent link="base_link" />
+    <child link="J1_link" />
+    <axis xyz="0 0 1" />
+    <limit effort="160" lower="-3.490658503988659" upper="3.490658503988659" velocity="2.6179938779914944" />
+  </joint>
+  <joint name="J2" type="revolute">
+    <origin rpy="0 0 0" xyz="0.0 0 0" />
+    <parent link="J1_link" />
+    <child link="J2_link" />
+    <axis xyz="0 1 0" />
+    <limit effort="160" lower="-3.139847324337799" upper="3.139847324337799" velocity="2.6179938779914944" />
+  </joint>
+  <joint name="J3" type="revolute">
+    <origin rpy="0 0 0" xyz="0 0 0.41" />
+    <parent link="J2_link" />
+    <child link="J3_link" />
+    <axis xyz="0 -1 0" />
+    <limit effort="160" lower="-1.1868238913561442" upper="4.328416544945937" velocity="3.141592653589793" />
+  </joint>
+  <joint name="J4" type="revolute">
+    <origin rpy="0 0 0" xyz="0 0 0.0" />
+    <parent link="J3_link" />
+    <child link="J4_link" />
+    <axis xyz="-1 0 0" />
+    <limit effort="40" lower="-3.3161255787892263" upper="3.3161255787892263" velocity="3.9269908169872414" />
+  </joint>
+  <joint name="J5" type="revolute">
+    <origin rpy="0 0 0" xyz="0.43 0 0" />
+    <parent link="J4_link" />
+    <child link="J5_link" />
+    <axis xyz="0 -1 0" />
+    <limit effort="40" lower="-3.139847324337799" upper="3.139847324337799" velocity="3.9269908169872414" />
+  </joint>
+  <joint name="J6" type="revolute">
+    <origin rpy="0 0 0" xyz="0 -0.13 0" />
+    <parent link="J5_link" />
+    <child link="J6_link" />
+    <axis xyz="-1 0 0" />
+    <limit effort="40" lower="-3.9269908169872414" upper="3.9269908169872414" velocity="3.9269908169872414" />
+  </joint>
+  <link name="wbase" />
+  <joint name="base_link-wbase" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0.185" />
+    <parent link="base_link" />
+    <child link="wbase" />
+  </joint>
+  <link name="flange" />
+  <joint name="J6-flange" type="fixed">
+    <origin rpy="0 0 0" xyz="0.145 0 0" />
+    <parent link="J6_link" />
+    <child link="flange" />
+  </joint>
+  <link name="fanuc_flange" />
+  <joint name="flange-fanuc_flange" type="fixed">
+    <origin rpy="3.141592653589793 -1.5707963267948966 0.0" xyz="0 0 0" />
+    <parent link="flange" />
+    <child link="fanuc_flange" />
+  </joint>
+  <joint name="base_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0" />
+    <parent link="world" />
+    <child link="base_link" />
+  </joint>
+  <joint name="child_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0" />
+    <parent link="flange" />
+    <child link="ee_mount" />
+  </joint>
+  <link name="palm_lower">
+    <visual>
+      <origin rpy="0 -0 0" xyz="-0.020095249652862544332 0.025757756134899473244 -0.034722403578460216134" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/palm_lower.stl" />
+      </geometry>
+      <material name="palm_lower_material">
+        <color rgba="0.60392156862745094426 0.14901960784313725283 0.14901960784313725283 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="0 -0 0" xyz="-0.020095249652862544332 0.025757756134899473244 -0.034722403578460216134" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/palm_lower.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <mass value="0.237" />
+      <inertia ixx="0.000354094" ixy="-0.000001193" ixz="-0.000002445" iyy="0.000260915" iyz="-0.000002905" izz="0.000529257" />
+    </inertial>
+  </link>
+  <link name="mcp_joint">
+    <visual>
+      <origin rpy="1.6375789613220999807e-15 -1.0210473302491019535e-30 1.7177968783327987474e-31" xyz="0.0084069022611744960438 0.0077662438597169954416 0.014657354985032912051" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/mcp_joint.stl" />
+      </geometry>
+      <material name="mcp_joint_material">
+        <color rgba="0.86666666666666669627 0.86666666666666669627 0.050980392156862744391 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="1.6375789613220999807e-15 -1.0210473302491019535e-30 1.7177968783327987474e-31" xyz="0.0084069022611744960438 0.0077662438597169954416 0.014657354985032912051" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/mcp_joint.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <mass value="0.044" />
+      <inertia ixx="0.000011499" ixy="0.000003049" ixz="0.000000121" iyy="0.000007796" iyz="0.000000112" izz="0.000014759" />
+    </inertial>
+  </link>
+  <link name="pip">
+    <visual>
+      <origin rpy="-1.570796326794896558 -1.570796326794896336 0" xyz="0.0096433630922713280131 0.00029999999999998951117 0.00078403401041737645627" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/pip.stl" />
+      </geometry>
+      <material name="pip_material">
+        <color rgba="0.74901960784313725839 0.74901960784313725839 0.74901960784313725839 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="-1.570796326794896558 -1.570796326794896336 0" xyz="0.0096433630922713280131 0.00029999999999998951117 0.00078403401041737645627" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/pip.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <mass value="0.032" />
+      <inertia ixx="0.000004798" ixy="0.000000012" ixz="0.000000004" iyy="0.000002862" iyz="0.000000011" izz="0.000004234" />
+    </inertial>
+  </link>
+  <link name="dip">
+    <visual>
+      <origin rpy="-3.141592653589793116 4.5075111242164408299e-32 4.4395481053923607589e-32" xyz="0.021133352895225002849 -0.0084321191467048792201 0.0097850881620952408213" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/dip.stl" />
+      </geometry>
+      <material name="dip_material">
+        <color rgba="0.86666666666666669627 0.86666666666666669627 0.050980392156862744391 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="-3.141592653589793116 4.5075111242164408299e-32 4.4395481053923607589e-32" xyz="0.021133352895225002849 -0.0084321191467048792201 0.0097850881620952408213" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/dip.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <mass value="0.037" />
+      <inertia ixx="0.000005542" ixy="-0.000000607" ixz="-0.000000017" iyy="0.000005727" iyz="-0.000000023" izz="0.000006682" />
+    </inertial>
+  </link>
+  <link name="fingertip">
+    <visual>
+      <origin rpy="3.141592653589793116 1.1993117970061734707e-33 4.4395481053923607589e-32" xyz="0.013286424108533503169 -0.0061142383865419869249 0.014499999999999497666" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/fingertip_base.stl" />
+      </geometry>
+      <material name="fingertip_material">
+        <color rgba="0.86666666666666669627 0.86666666666666669627 0.050980392156862744391 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="3.141592653589793116 1.1993117970061734707e-33 4.4395481053923607589e-32" xyz="0.013286424108533503169 -0.0061142383865419869249 0.014499999999999497666" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/fingertip_base.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <mass value="0.016" />
+      <inertia ixx="0.000003368" ixy="0.000000115" ixz="0" iyy="0.000001556" iyz="0" izz="0.000002863" />
+    </inertial>
+  </link>
+  <link name="mcp_joint_2">
+    <visual>
+      <origin rpy="1.6375789613220999807e-15 -1.0076465469034000467e-30 2.1209300131419907151e-61" xyz="0.0084069022611744960438 0.0077662438597169954416 0.014657354985032913786" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/mcp_joint.stl" />
+      </geometry>
+      <material name="mcp_joint_material">
+        <color rgba="0.86666666666666669627 0.86666666666666669627 0.050980392156862744391 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="1.6375789613220999807e-15 -1.0076465469034000467e-30 2.1209300131419907151e-61" xyz="0.0084069022611744960438 0.0077662438597169954416 0.014657354985032913786" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/mcp_joint.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <mass value="0.044" />
+      <inertia ixx="0.000011499" ixy="0.000003049" ixz="0.000000121" iyy="0.000007796" iyz="0.000000112" izz="0.000014759" />
+    </inertial>
+  </link>
+  <link name="pip_2">
+    <visual>
+      <origin rpy="-1.570796326794896558 -1.570796326794896336 0" xyz="0.0096433630922713280131 0.00029999999999999471534 0.00078403401041737645627" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/pip.stl" />
+      </geometry>
+      <material name="pip_material">
+        <color rgba="0.74901960784313725839 0.74901960784313725839 0.74901960784313725839 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="-1.570796326794896558 -1.570796326794896336 0" xyz="0.0096433630922713280131 0.00029999999999999471534 0.00078403401041737645627" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/pip.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <mass value="0.032" />
+      <inertia ixx="0.000004798" ixy="0.000000012" ixz="0.000000004" iyy="0.000002862" iyz="0.000000011" izz="0.000004234" />
+    </inertial>
+  </link>
+  <link name="dip_2">
+    <visual>
+      <origin rpy="-3.141592653589793116 2.1146933785271955805e-32 1.4408183216511868558e-31" xyz="0.021133352895225002849 -0.0084321191467048653423 0.0097850881620952373519" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/dip.stl" />
+      </geometry>
+      <material name="dip_material">
+        <color rgba="0.86666666666666669627 0.86666666666666669627 0.050980392156862744391 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="-3.141592653589793116 2.1146933785271955805e-32 1.4408183216511868558e-31" xyz="0.021133352895225002849 -0.0084321191467048653423 0.0097850881620952373519" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/dip.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <mass value="0.037" />
+      <inertia ixx="0.000005542" ixy="-0.000000607" ixz="-0.000000017" iyy="0.000005727" iyz="-0.000000023" izz="0.000006682" />
+    </inertial>
+  </link>
+  <link name="fingertip_2">
+    <visual>
+      <origin rpy="3.141592653589793116 1.1993117970061734707e-33 4.4395481053923607589e-32" xyz="0.013286424108533503169 -0.0061142383865419869249 0.014499999999999497666" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/fingertip_base.stl" />
+      </geometry>
+      <material name="fingertip_material">
+        <color rgba="0.86666666666666669627 0.86666666666666669627 0.050980392156862744391 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="3.141592653589793116 1.1993117970061734707e-33 4.4395481053923607589e-32" xyz="0.013286424108533503169 -0.0061142383865419869249 0.014499999999999497666" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/fingertip_base.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <mass value="0.016" />
+      <inertia ixx="0.000003368" ixy="0.000000115" ixz="0" iyy="0.000001556" iyz="0" izz="0.000002863" />
+    </inertial>
+  </link>
+  <link name="mcp_joint_3">
+    <visual>
+      <origin rpy="1.6375789613220999807e-15 -1.0059504988632626953e-30 5.729641584552035421e-32" xyz="0.0084069022611744995133 0.0077662438597169963089 0.014657354985032913786" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/mcp_joint.stl" />
+      </geometry>
+      <material name="mcp_joint_material">
+        <color rgba="0.86666666666666669627 0.86666666666666669627 0.050980392156862744391 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="1.6375789613220999807e-15 -1.0059504988632626953e-30 5.729641584552035421e-32" xyz="0.0084069022611744995133 0.0077662438597169963089 0.014657354985032913786" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/mcp_joint.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <mass value="0.044" />
+      <inertia ixx="0.000011499" ixy="0.000003049" ixz="0.000000121" iyy="0.000007796" iyz="0.000000112" izz="0.000014759" />
+    </inertial>
+  </link>
+  <link name="pip_3">
+    <visual>
+      <origin rpy="-1.570796326794896558 -1.570796326794896336 0" xyz="0.0096433630922713314826 0.00029999999999998083755 0.00078403401041737645627" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/pip.stl" />
+      </geometry>
+      <material name="pip_material">
+        <color rgba="0.74901960784313725839 0.74901960784313725839 0.74901960784313725839 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="-1.570796326794896558 -1.570796326794896336 0" xyz="0.0096433630922713314826 0.00029999999999998083755 0.00078403401041737645627" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/pip.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <mass value="0.032" />
+      <inertia ixx="0.000004798" ixy="0.000000012" ixz="0.000000004" iyy="0.000002862" iyz="0.000000011" izz="0.000004234" />
+    </inertial>
+  </link>
+  <link name="dip_3">
+    <visual>
+      <origin rpy="-3.141592653589793116 -1.4095651113919093005e-33 1.5565411607615035382e-32" xyz="0.021133352895225006318 -0.0084321191467048653423 0.0097850881620952373519" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/dip.stl" />
+      </geometry>
+      <material name="dip_material">
+        <color rgba="0.86666666666666669627 0.86666666666666669627 0.050980392156862744391 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="-3.141592653589793116 -1.4095651113919093005e-33 1.5565411607615035382e-32" xyz="0.021133352895225006318 -0.0084321191467048653423 0.0097850881620952373519" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/dip.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <mass value="0.037" />
+      <inertia ixx="0.000005542" ixy="-0.000000607" ixz="-0.000000017" iyy="0.000005727" iyz="-0.000000023" izz="0.000006682" />
+    </inertial>
+  </link>
+  <link name="fingertip_3">
+    <visual>
+      <origin rpy="3.141592653589793116 1.1993117970061734707e-33 4.4395481053923607589e-32" xyz="0.013286424108533503169 -0.0061142383865419869249 0.014499999999999497666" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/fingertip_base.stl" />
+      </geometry>
+      <material name="fingertip_material">
+        <color rgba="0.86666666666666669627 0.86666666666666669627 0.050980392156862744391 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="3.141592653589793116 1.1993117970061734707e-33 4.4395481053923607589e-32" xyz="0.013286424108533503169 -0.0061142383865419869249 0.014499999999999497666" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/fingertip_base.stl" />
+      </geometry>
+      <material name="fingertip_material">
+        <color rgba="0.86666666666666669627 0.86666666666666669627 0.050980392156862744391 1.0" />
+      </material>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <mass value="0.016" />
+      <inertia ixx="0.000003368" ixy="0.000000115" ixz="0" iyy="0.000001556" iyz="0" izz="0.000002863" />
+    </inertial>
+  </link>
+  <link name="pip_4">
+    <visual>
+      <origin rpy="-1.570796326794896558 -1.570796326794896336 0" xyz="-0.0053566369077286714317 0.00029999999999999991951 0.00078403401041737819099" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/pip.stl" />
+      </geometry>
+      <material name="pip_material">
+        <color rgba="0.74901960784313725839 0.74901960784313725839 0.74901960784313725839 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="-1.570796326794896558 -1.570796326794896336 0" xyz="-0.0053566369077286714317 0.00029999999999999991951 0.00078403401041737819099" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/pip.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <mass value="0.032" />
+      <inertia ixx="0.000004798" ixy="0.000000012" ixz="0.000000004" iyy="0.000002862" iyz="0.000000011" izz="0.000004234" />
+    </inertial>
+  </link>
+  <link name="thumb_pip">
+    <visual>
+      <origin rpy="1.570796326794896558 1.6050198443300152637e-46 -3.9204996250525192755e-59" xyz="0.011961920770611186859 -5.3082538364890297089e-16 -0.015852648956664199681" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/thumb_pip.stl" />
+      </geometry>
+      <material name="thumb_pip_material">
+        <color rgba="0.86666666666666669627 0.86666666666666669627 0.050980392156862744391 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="1.570796326794896558 1.6050198443300152637e-46 -3.9204996250525192755e-59" xyz="0.011961920770611186859 -5.3082538364890297089e-16 -0.015852648956664199681" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/thumb_pip.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <mass value="0.003" />
+      <inertia ixx="0.000000593" ixy="0" ixz="0" iyy="0.000000549" iyz="0" izz="0.000000224" />
+    </inertial>
+  </link>
+  <link name="thumb_dip">
+    <visual>
+      <origin rpy="1.9428902930940098942e-16 3.2751579226442200773e-15 1.1123758529657360012e-46" xyz="0.043968715707239175439 0.057952952973709198625 -0.0086286764493694757122" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/thumb_dip.stl" />
+      </geometry>
+      <material name="thumb_dip_material">
+        <color rgba="0.86666666666666669627 0.86666666666666669627 0.050980392156862744391 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="1.9428902930940098942e-16 3.2751579226442200773e-15 1.1123758529657360012e-46" xyz="0.043968715707239175439 0.057952952973709198625 -0.0086286764493694757122" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/thumb_dip.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <mass value="0.038" />
+      <inertia ixx="0.000008474" ixy="0.000000241" ixz="0.000000026" iyy="0.000003841" iyz="0.000000025" izz="0.000007679" />
+    </inertial>
+  </link>
+  <link name="thumb_fingertip">
+    <visual>
+      <origin rpy="4.3790577010156367543e-47 -3.3306690738754701143e-16 1.2042408677791935383e-46" xyz="0.062559538462667388381 0.078459682911396988469 0.048992911807332215068" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/thumb_fingertip_base.stl" />
+      </geometry>
+      <material name="thumb_fingertip_material">
+        <color rgba="0.60392156862745094426 0.14901960784313725283 0.14901960784313725283 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="4.3790577010156367543e-47 -3.3306690738754701143e-16 1.2042408677791935383e-46" xyz="0.062559538462667388381 0.078459682911396988469 0.048992911807332215068" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/thumb_fingertip_base.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <mass value="0.049" />
+      <inertia ixx="0.000020372" ixy="-0.000000489" ixz="-0.00000003" iyy="0.000004336" iyz="-0.000000097" izz="0.000019845" />
+    </inertial>
+  </link>
+  <link name="fingertip_new">
+    <visual>
+      <origin rpy="0 3.1415926 0" xyz="0.0165 0 0.01" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/paxini_base.STL" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="fingertip_material">
+        <color rgba="0.86666666666666669627 0.86666666666666669627 0.050980392156862744391 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="0 3.1415926 0" xyz="0.0165 0 0.01" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/paxini_base.STL" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="0 3.1415926 0" xyz="0.017 0 0.01" />
+      <mass value="0.0000000001" />
+      <inertia ixx="0.0000000001" ixy="0" ixz="0" iyy="0.0000000001" iyz="0" izz="0.0000000001" />
+    </inertial>
+  </link>
+  <link name="fingertip_new_tip">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/paxini_fingertip.STL" scale="1 1 1" />
+      </geometry>
+      <material name="fingertip_material">
+        <color rgba="0.86666666666666669627 0.86666666666666669627 0.050980392156862744391 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/paxini_fingertip.STL" scale="1 1 1" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <mass value="0.0000000001" />
+      <inertia ixx="0.0000000001" ixy="0" ixz="0" iyy="0.0000000001" iyz="0" izz="0.0000000001" />
+    </inertial>
+  </link>
+  <link name="fingertip_2_new">
+    <visual>
+      <origin rpy="0 3.1415926 0" xyz="0.0165 0 0.01" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/paxini_base.STL" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="fingertip_material">
+        <color rgba="0.86666666666666669627 0.86666666666666669627 0.050980392156862744391 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="0 3.1415926 0" xyz="0.0165 0 0.01" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/paxini_base.STL" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="0 3.1415926 0" xyz="0.017 0 0.01" />
+      <mass value="0.0000000001" />
+      <inertia ixx="0.0000000001" ixy="0" ixz="0" iyy="0.0000000001" iyz="0" izz="0.0000000001" />
+    </inertial>
+  </link>
+  <link name="fingertip_2_new_tip">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/paxini_fingertip.STL" scale="1 1 1" />
+      </geometry>
+      <material name="fingertip_material">
+        <color rgba="0.86666666666666669627 0.86666666666666669627 0.050980392156862744391 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/paxini_fingertip.STL" scale="1 1 1" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <mass value="0.0000000001" />
+      <inertia ixx="0.0000000001" ixy="0" ixz="0" iyy="0.0000000001" iyz="0" izz="0.0000000001" />
+    </inertial>
+  </link>
+  <link name="fingertip_3_new">
+    <visual>
+      <origin rpy="0 3.1415926 0" xyz="0.0165 0 0.01" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/paxini_base.STL" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="fingertip_material">
+        <color rgba="0.86666666666666669627 0.86666666666666669627 0.050980392156862744391 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="0 3.1415926 0" xyz="0.0165 0 0.01" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/paxini_base.STL" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="0 3.1415926 0" xyz="0.017 0 0.01" />
+      <mass value="0.0000000001" />
+      <inertia ixx="0.0000000001" ixy="0" ixz="0" iyy="0.0000000001" iyz="0" izz="0.0000000001" />
+    </inertial>
+  </link>
+  <link name="fingertip_3_new_tip">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/paxini_fingertip.STL" scale="1 1 1" />
+      </geometry>
+      <material name="fingertip_material">
+        <color rgba="0.86666666666666669627 0.86666666666666669627 0.050980392156862744391 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/paxini_fingertip.STL" scale="1 1 1" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <mass value="0.0000000001" />
+      <inertia ixx="0.0000000001" ixy="0" ixz="0" iyy="0.0000000001" iyz="0" izz="0.0000000001" />
+    </inertial>
+  </link>
+  <link name="thumb_fingertip_new">
+    <visual>
+      <origin rpy="0 3.1415926 0" xyz="0.0165 0 0.01" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/paxini_base.STL" scale="0.001 0.001 0.001" />
+      </geometry>
+      <material name="fingertip_material">
+        <color rgba="0.86666666666666669627 0.86666666666666669627 0.050980392156862744391 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="0 3.1415926 0" xyz="0.0165 0 0.01" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/paxini_base.STL" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <mass value="0.0000000001" />
+      <inertia ixx="0.0000000001" ixy="0" ixz="0" iyy="0.0000000001" iyz="0" izz="0.0000000001" />
+    </inertial>
+  </link>
+  <link name="thumb_fingertip_new_tip">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/paxini_fingertip.STL" scale="1 1 1" />
+      </geometry>
+      <material name="fingertip_material">
+        <color rgba="0.86666666666666669627 0.86666666666666669627 0.050980392156862744391 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="../../panda_leap_paxini/meshes/leap_hand/paxini_fingertip.STL" scale="1 1 1" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <mass value="0.0000000001" />
+      <inertia ixx="0.0000000001" ixy="0" ixz="0" iyy="0.0000000001" iyz="0" izz="0.0000000001" />
+    </inertial>
+  </link>
+  <link name="finger1_tip_center" />
+  <link name="finger2_tip_center" />
+  <link name="finger3_tip_center" />
+  <link name="thumb_tip_center" />
+  <link name="wrist" />
+  <link name="finger1_tip_center_lower" />
+  <link name="finger2_tip_center_lower" />
+  <link name="finger3_tip_center_lower" />
+  <link name="thumb_tip_center_lower" />
+  <joint name="joint_1" type="revolute">
+    <origin rpy="1.5707963267948950037 1.5707963267948945596 0" xyz="-0.0070952496528625457958 0.023057756134899472233 -0.01872240357846021927" />
+    <parent link="palm_lower" />
+    <child link="mcp_joint" />
+    <axis xyz="0 0 -1" />
+    <limit effort="0.95" lower="-0.314" upper="2.23" velocity="8.48" />
+    <joint_properties friction="0.0" />
+  </joint>
+  <joint name="joint_5" type="revolute">
+    <origin rpy="1.570796326794896558 1.570796326794896558 0" xyz="-0.0070952496528625388569 -0.022392243865100525113 -0.018722403578460229678" />
+    <parent link="palm_lower" />
+    <child link="mcp_joint_2" />
+    <axis xyz="0 0 -1" />
+    <limit effort="0.95" lower="-0.314" upper="2.23" velocity="8.48" />
+    <joint_properties friction="0.0" />
+  </joint>
+  <joint name="joint_9" type="revolute">
+    <origin rpy="1.5707963267948950037 1.5707963267948945596 0" xyz="-0.0070952454426398371343 -0.067842243865100515521 -0.018722407666402932774" />
+    <parent link="palm_lower" />
+    <child link="mcp_joint_3" />
+    <axis xyz="0 0 -1" />
+    <limit effort="0.95" lower="-0.314" upper="2.23" velocity="8.48" />
+    <joint_properties friction="0.0" />
+  </joint>
+  <joint name="joint_12" type="revolute">
+    <origin rpy="-8.2381766464939424156e-17 1.5707963267948956698 0" xyz="-0.069395249652862533996 -0.0012422438651005258004 -0.021622403578460215601" />
+    <parent link="palm_lower" />
+    <child link="pip_4" />
+    <axis xyz="0 0 -1" />
+    <limit effort="0.95" lower="-0.349" upper="2.094" velocity="8.48" />
+    <joint_properties friction="0.0" />
+  </joint>
+  <joint name="palm_to_wrist" type="fixed">
+    <origin rpy="0 1.5707963267948966 0" xyz="-0.16 -0.04 -0.01" />
+    <parent link="palm_lower" />
+    <child link="wrist" />
+  </joint>
+  <joint name="joint_0" type="revolute">
+    <origin rpy="-1.570796326794896558 -1.0065212660796336576e-15 1.5707963267948943376" xyz="-0.012200000000000007713 0.038099999999999994982 0.014500000000000000736" />
+    <parent link="mcp_joint" />
+    <child link="pip" />
+    <axis xyz="0 0 -1" />
+    <limit effort="0.95" lower="-1.047" upper="1.047" velocity="8.48" />
+    <joint_properties friction="0.0" />
+    <dynamics D="1" K="7000" damping="0.003" friction="0.0" mu_coulomb="0" mu_viscous="16" />
+  </joint>
+  <joint name="joint_4" type="revolute">
+    <origin rpy="-1.570796326794896558 -1.0065212760057939085e-15 1.5707963267948943376" xyz="-0.012200000000000019856 0.038099999999999981104 0.01450000000000000594" />
+    <parent link="mcp_joint_2" />
+    <child link="pip_2" />
+    <axis xyz="0 0 -1" />
+    <limit effort="0.95" lower="-1.047" upper="1.047" velocity="8.48" />
+    <joint_properties friction="0.0" />
+  </joint>
+  <joint name="joint_8" type="revolute">
+    <origin rpy="-1.570796326794896558 -1.0065212660796360242e-15 1.5707963267948943376" xyz="-0.012200000000000004244 0.038100000000000001921 0.014499999999999999001" />
+    <parent link="mcp_joint_3" />
+    <child link="pip_3" />
+    <axis xyz="0 0 -1" />
+    <limit effort="0.95" lower="-1.047" upper="1.047" velocity="8.48" />
+    <joint_properties friction="0.0" />
+  </joint>
+  <joint name="joint_13" type="revolute">
+    <origin rpy="1.5707963267948958919 -1.570796326794896336 0" xyz="-2.7755575615628913511e-17 0.014300000000000005415 -0.013000000000000011546" />
+    <parent link="pip_4" />
+    <child link="thumb_pip" />
+    <axis xyz="0 0 -1" />
+    <limit effort="0.95" lower="-0.47" upper="2.443" velocity="8.48" />
+    <joint_properties friction="0.0" />
+  </joint>
+  <joint name="joint_2" type="revolute">
+    <origin rpy="1.5707963267948958919 -1.570796326794896336 0" xyz="0.01499999999999996822 0.014299999999999904801 -0.012999999999999824196" />
+    <parent link="pip" />
+    <child link="dip" />
+    <axis xyz="0 0 -1" />
+    <limit effort="0.95" lower="-0.506" upper="1.885" velocity="8.48" />
+    <joint_properties friction="0.0" />
+  </joint>
+  <joint name="joint_6" type="revolute">
+    <origin rpy="1.5707963267948958919 -1.570796326794896336 0" xyz="0.014999999999999975159 0.014300000000000000211 -0.013000000000000018485" />
+    <parent link="pip_2" />
+    <child link="dip_2" />
+    <axis xyz="0 0 -1" />
+    <limit effort="0.95" lower="-0.506" upper="1.885" velocity="8.48" />
+    <joint_properties friction="0.0" />
+  </joint>
+  <joint name="joint_10" type="revolute">
+    <origin rpy="1.5707963267948958919 -1.570796326794896336 0" xyz="0.014999999999999971689 0.014299999999999951639 -0.012999999999999959505" />
+    <parent link="pip_3" />
+    <child link="dip_3" />
+    <axis xyz="0 0 -1" />
+    <limit effort="0.95" lower="-0.506" upper="1.885" velocity="8.48" />
+    <joint_properties friction="0.0" />
+  </joint>
+  <joint name="joint_14" type="revolute">
+    <origin rpy="-1.570796326794896558 1.6050198443300131245e-46 -1.9721522630516624601e-31" xyz="0 0.014499999999999966041 -0.017000000000000053263" />
+    <parent link="thumb_pip" />
+    <child link="thumb_dip" />
+    <axis xyz="0 0 -1" />
+    <limit effort="0.95" lower="-1.20" upper="1.90" velocity="8.48" />
+    <joint_properties friction="0.0" />
+  </joint>
+  <joint name="joint_3" type="revolute">
+    <origin rpy="4.5935029425113685044e-17 -2.8730071914463794583e-16 4.4395481053923607589e-32" xyz="-4.0880582495572692636e-09 -0.036100004210367367397 0.00020000000000007858714" />
+    <parent link="dip" />
+    <child link="fingertip" />
+    <axis xyz="0 0 -1" />
+    <limit effort="0.95" lower="-0.366" upper="2.042" velocity="8.48" />
+    <joint_properties friction="0.0" />
+  </joint>
+  <joint name="joint_7" type="revolute">
+    <origin rpy="4.5935029425113654229e-17 -2.8730071914463794583e-16 1.4408183216511868558e-31" xyz="1.0061396160665481148e-16 -0.036099999999999854428 0.00020000000000007858714" />
+    <parent link="dip_2" />
+    <child link="fingertip_2" />
+    <axis xyz="0 0 -1" />
+    <limit effort="0.95" lower="-0.366" upper="2.042" velocity="8.48" />
+    <joint_properties friction="0.0" />
+  </joint>
+  <joint name="joint_11" type="revolute">
+    <origin rpy="4.5935029425113685044e-17 -2.8730071914463799514e-16 1.5565411607615035382e-32" xyz="9.7144514654701197287e-17 -0.036099999999999868305 0.00020000000000007511769" />
+    <parent link="dip_3" />
+    <child link="fingertip_3" />
+    <axis xyz="0 0 -1" />
+    <limit effort="0.95" lower="-0.366" upper="2.042" velocity="8.48" />
+    <joint_properties friction="0.0" />
+  </joint>
+  <joint name="joint_15" type="revolute">
+    <origin rpy="1.5063958491491781023e-44 5.4234187233935260503e-31 3.141592653589793116" xyz="-1.249000902703301108e-16 0.046599999999999863753 0.00019999999999997710581" />
+    <parent link="thumb_dip" />
+    <child link="thumb_fingertip" />
+    <axis xyz="0 0 -1" />
+    <limit effort="0.95" lower="-1.34" upper="1.88" velocity="8.48" />
+    <joint_properties friction="0.0" />
+  </joint>
+  <joint name="finger1_tipbase2tip" type="fixed">
+    <origin rpy="0 1.5707963267948966 3.141592653589793" xyz="0 -0.017 0.0145" />
+    <parent link="fingertip" />
+    <child link="fingertip_new" />
+  </joint>
+  <joint name="finger2_tipbase2tip" type="fixed">
+    <origin rpy="0 1.5707963267948966 3.141592653589793" xyz="0 -0.017 0.0145" />
+    <parent link="fingertip_2" />
+    <child link="fingertip_2_new" />
+  </joint>
+  <joint name="finger3_tipbase2tip" type="fixed">
+    <origin rpy="0 1.5707963267948966 3.141592653589793" xyz="0 -0.017 0.0145" />
+    <parent link="fingertip_3" />
+    <child link="fingertip_3_new" />
+  </joint>
+  <joint name="thumb_tipbase2tip" type="fixed">
+    <origin rpy="0 1.5707963267948966 3.141592653589793" xyz="0 -0.03 -0.0145" />
+    <parent link="thumb_fingertip" />
+    <child link="thumb_fingertip_new" />
+  </joint>
+  <joint name="finger1_new2newtip" type="fixed">
+    <origin rpy="0 3.1415926 0" xyz="0 0.0235 0" />
+    <parent link="fingertip_new" />
+    <child link="fingertip_new_tip" />
+  </joint>
+  <joint name="finger2_new2newtip" type="fixed">
+    <origin rpy="0 3.1415926 0" xyz="0 0.0235 0" />
+    <parent link="fingertip_2_new" />
+    <child link="fingertip_2_new_tip" />
+  </joint>
+  <joint name="finger3_new2newtip" type="fixed">
+    <origin rpy="0 3.1415926 0" xyz="0 0.0235 0" />
+    <parent link="fingertip_3_new" />
+    <child link="fingertip_3_new_tip" />
+  </joint>
+  <joint name="thumb_new2newtip" type="fixed">
+    <origin rpy="0 3.1415926 0" xyz="0 0.0235 0" />
+    <parent link="thumb_fingertip_new" />
+    <child link="thumb_fingertip_new_tip" />
+  </joint>
+  <joint name="finger1_tip2center" type="fixed">
+    <origin rpy="3.1415926 0 1.5707963267948966" xyz="0 0.003 -0.011" />
+    <parent link="fingertip_new_tip" />
+    <child link="finger1_tip_center" />
+  </joint>
+  <joint name="finger2_tip2center" type="fixed">
+    <origin rpy="3.1415926 0 1.5707963267948966" xyz="0 0.003 -0.011" />
+    <parent link="fingertip_2_new_tip" />
+    <child link="finger2_tip_center" />
+  </joint>
+  <joint name="finger3_tip2center" type="fixed">
+    <origin rpy="3.1415926 0 1.5707963267948966" xyz="0 0.003 -0.011" />
+    <parent link="fingertip_3_new_tip" />
+    <child link="finger3_tip_center" />
+  </joint>
+  <joint name="thumb_tip2center" type="fixed">
+    <origin rpy="3.1415926 0 1.5707963267948966" xyz="0 0.003 -0.011" />
+    <parent link="thumb_fingertip_new_tip" />
+    <child link="thumb_tip_center" />
+  </joint>
+  <joint name="finger1_tip_center2lower" type="fixed">
+    <origin rpy="0 0 0" xyz="-0.02 0 0" />
+    <parent link="finger1_tip_center" />
+    <child link="finger1_tip_center_lower" />
+  </joint>
+  <joint name="finger2_tip_center2lower" type="fixed">
+    <origin rpy="0 0 0" xyz="-0.02 0 0" />
+    <parent link="finger2_tip_center" />
+    <child link="finger2_tip_center_lower" />
+  </joint>
+  <joint name="finger3_tip_center2lower" type="fixed">
+    <origin rpy="0 0 0" xyz="-0.02 0 0" />
+    <parent link="finger3_tip_center" />
+    <child link="finger3_tip_center_lower" />
+  </joint>
+  <joint name="thumb_tip_center2lower" type="fixed">
+    <origin rpy="0 0 0" xyz="-0.02 0 0" />
+    <parent link="thumb_tip_center" />
+    <child link="thumb_tip_center_lower" />
+  </joint>
+  <joint name="flange_to_leap" type="fixed">
+    <origin rpy="0 -1.56 0" xyz="0.01 0.03 0.065" />
+    <parent link="flange" />
+    <child link="palm_lower" />
+  </joint>
+</robot>

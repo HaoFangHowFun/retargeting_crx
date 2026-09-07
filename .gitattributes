@@ -1,0 +1,2 @@
+# Preserve the hashed upstream source verbatim, including its existing blank line.
+assets/robots/crx5ia_leap_paxini/provenance/crx5ia_urdf_macro.xacro -text whitespace=-blank-at-eol
