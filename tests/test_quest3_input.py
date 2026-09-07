@@ -61,9 +61,9 @@ def test_decode_quest3_sample_maps_webxr_25_joints_to_mano_21() -> None:
     assert sample.timestamp == 5.0
     expected_rotation = np.array(
         [
-            [0.0, 0.0, -1.0],
+            [0.0, -1.0, 0.0],
             [-1.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0],
+            [0.0, 0.0, -1.0],
         ]
     )
     np.testing.assert_allclose(sample.wrist_pose_sensor[:3, :3], expected_rotation)
@@ -76,6 +76,12 @@ def test_decode_quest3_sample_maps_webxr_25_joints_to_mano_21() -> None:
         (selected_positions - wrist_position) @ expected_rotation,
     )
     np.testing.assert_allclose(sample.keypoints_wrist[0], np.zeros(3))
+    np.testing.assert_allclose(
+        sample.keypoints_wrist @ sample.wrist_pose_sensor[:3, :3].T
+        + sample.wrist_pose_sensor[:3, 3],
+        selected_positions,
+        atol=1e-12,
+    )
     assert not sample.keypoints_wrist.flags.writeable
     assert not sample.wrist_pose_sensor.flags.writeable
 

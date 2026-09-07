@@ -5,9 +5,15 @@ from __future__ import annotations
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-from mr_utils.utils_mano import OPERATOR2MANO_LEFT, OPERATOR2MANO_RIGHT
+from mr_utils.utils_mano import OPERATOR2MANO_LEFT
 from teleoperation.inputs.quest3.model import HandFrame, JOINT_NAMES
 from teleoperation.types import SensorHandSample
+
+
+# Right-hand simulation calibration: previous operator basis followed by +90
+# degrees about its local X axis. MANO +X = WebXR -Y, +Y = -X, +Z = -Z.
+# Keep Quest-specific calibration local rather than changing the shared AVP basis.
+OPERATOR2MANO_RIGHT_QUEST = np.array([[0, -1, 0], [-1, 0, 0], [0, 0, -1]])
 
 
 # MediaPipe/MANO uses four joints for each non-thumb finger. WebXR additionally
@@ -97,7 +103,7 @@ def decode_quest3_sample(
     wrist = hand.joints["wrist"]
     wrist_rotation = Rotation.from_quat(wrist.rotation_xyzw).as_matrix()
     operator_to_mano = (
-        OPERATOR2MANO_RIGHT if hand_side == "right" else OPERATOR2MANO_LEFT
+        OPERATOR2MANO_RIGHT_QUEST if hand_side == "right" else OPERATOR2MANO_LEFT
     )
     wrist_rotation_mano = wrist_rotation @ operator_to_mano
     wrist_position = np.asarray(wrist.position_m, dtype=float)
