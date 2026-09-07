@@ -62,7 +62,7 @@ def test_input_configs_carry_detector_world_calibration():
     for config_path in Path("configs/inputs").glob("*.yaml"):
         input_config = load_detection_source_config(config_path)
 
-        assert input_config.input_device in {"rgb", "avp"}
+        assert input_config.input_device in {"rgb", "avp", "quest3"}
         assert len(input_config.rotation_euler_xyz_deg) == 3
         assert len(input_config.translation) == 3
 

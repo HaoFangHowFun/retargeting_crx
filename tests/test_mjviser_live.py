@@ -110,6 +110,43 @@ class _FakeGui:
         return handle
 
 
+class _FakeSceneNodeHandle:
+    """Mutable fake for frames, labels, and hand geometry."""
+
+    def __init__(self, name: str, **properties) -> None:
+        self.name = name
+        self.visible = True
+        for key, value in properties.items():
+            setattr(self, key, value)
+
+
+class _FakeSceneApi:
+    """Minimal scene API used by wrist and human-hand diagnostics."""
+
+    def __init__(self) -> None:
+        self.frames = []
+        self.labels = []
+        self.point_clouds = []
+        self.line_segments = []
+
+    def _add(self, collection, name: str, **properties):
+        handle = _FakeSceneNodeHandle(name, **properties)
+        collection.append(handle)
+        return handle
+
+    def add_frame(self, name: str, **properties):
+        return self._add(self.frames, name, **properties)
+
+    def add_label(self, name: str, text: str, **properties):
+        return self._add(self.labels, name, text=text, **properties)
+
+    def add_point_cloud(self, name: str, **properties):
+        return self._add(self.point_clouds, name, **properties)
+
+    def add_line_segments(self, name: str, **properties):
+        return self._add(self.line_segments, name, **properties)
+
+
 class _FakeAtomic:
     """Context-manager fake for one atomic Viser update batch."""
 
@@ -165,10 +202,21 @@ def _fake_mj_id2name(model, object_type, object_id: int) -> str:
     return model.joint_names[object_id]
 
 
+def _fake_mj_name2id(model, object_type, name: str) -> int:
+    """Resolve a fake body name by model index."""
+    if object_type != 1:
+        return -1
+    try:
+        return model.body_names.index(name)
+    except ValueError:
+        return -1
+
+
 _FAKE_MUJOCO = SimpleNamespace(
     mjtJoint=SimpleNamespace(mjJNT_HINGE=3),
-    mjtObj=SimpleNamespace(mjOBJ_JOINT=0),
+    mjtObj=SimpleNamespace(mjOBJ_JOINT=0, mjOBJ_BODY=1),
     mj_id2name=_fake_mj_id2name,
+    mj_name2id=_fake_mj_name2id,
 )
 
 
@@ -188,6 +236,7 @@ class _FakeMujocoModel:
         self.jnt_type = np.array([3, 3, 3])
         self.jnt_qposadr = np.array([1, 0, 2])
         self.joint_names = ("joint_b", "joint_a", "joint_c")
+        self.body_names = ("wrist",)
 
 
 class _FakeViserServer:
@@ -211,7 +260,7 @@ class _FakeViserServer:
         self.stop_count = 0
         self.atomic_count = 0
         self.gui = _FakeGui()
-        self.scene = SimpleNamespace()
+        self.scene = _FakeSceneApi()
         self.instances.append(self)
 
     def get_port(self) -> int:
@@ -350,7 +399,11 @@ def test_mjviser_adapter_passively_updates_and_manages_lifecycle(monkeypatch):
             raise KeyboardInterrupt
 
     model = _FakeMujocoModel()
-    data = SimpleNamespace(qpos=np.array([0.1, 0.2, 0.3]))
+    data = SimpleNamespace(
+        qpos=np.array([0.1, 0.2, 0.3]),
+        xpos=np.array([[0.4, 0.0, 0.0]]),
+        xmat=np.eye(3).reshape(1, 9),
+    )
     config = MujocoWebViewerConfig(
         enabled=True,
         host="127.0.0.1",
@@ -364,6 +417,23 @@ def test_mjviser_adapter_passively_updates_and_manages_lifecycle(monkeypatch):
     visualizer = mjviser.MujocoWebVisualizer(model, data, config, sleep=sleep)
 
     visualizer.update()
+    target_pose = np.eye(4)
+    target_pose[:3, :3] = np.array(
+        [
+            [0.0, -1.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0],
+        ]
+    )
+    target_pose[:3, 3] = [0.1, 0.0, 0.0]
+    from retargeting.core.types import RetargetingHandObservation
+
+    visualizer.update_observation(
+        RetargetingHandObservation(
+            keypoints_wrist=np.zeros((21, 3)),
+            wrist_pose_world=target_pose,
+        )
+    )
     visualizer.wait_for_client()
     visualizer.wait_after_completion()
     visualizer.close()
@@ -374,7 +444,7 @@ def test_mjviser_adapter_passively_updates_and_manages_lifecycle(monkeypatch):
     assert server.host == "127.0.0.1"
     assert server.port == 0
     assert server.stop_count == 1
-    assert server.atomic_count == 1
+    assert server.atomic_count == 4
     assert scene.server is server
     assert scene.model is model
     assert scene.num_envs == 1
@@ -384,15 +454,34 @@ def test_mjviser_adapter_passively_updates_and_manages_lifecycle(monkeypatch):
         "camera_elevation": 30.0,
     }
     assert scene.updated_data == [data]
-    assert scene.tabs.tabs == [("Joint angles", "adjustments")]
+    assert scene.tabs.tabs == [
+        ("Joint angles", "adjustments"),
+        ("Wrist diagnostics", "adjustments"),
+    ]
     assert visualizer._hand_renderer.root_node_name == "/fixed_bodies/current/human"
     assert [handle.label for handle in server.gui.numbers] == [
         "joint_b [rad]",
         "joint_a [rad]",
         "joint_c [rad]",
+        "Position error [cm]",
+        "Orientation error [deg]",
     ]
-    assert [handle.value for handle in server.gui.numbers] == [0.2, 0.1, 0.3]
+    assert [handle.value for handle in server.gui.numbers] == [
+        0.2,
+        0.1,
+        0.3,
+        30.0,
+        90.0,
+    ]
     assert all(handle.options["disabled"] is True for handle in server.gui.numbers)
+    assert [handle.name for handle in server.scene.frames] == [
+        "/fixed_bodies/current/robot/wrist",
+        "/fixed_bodies/current/human/wrist",
+    ]
+    assert [handle.text for handle in server.scene.labels] == [
+        "Panda wrist (actual)",
+        "Quest wrist (target)",
+    ]
     assert sleep_durations == [0.05, 1.0]
 
 
@@ -418,6 +507,7 @@ def test_joint_angle_readouts_cover_all_panda_leap_joints_and_qpos_addresses(mon
     model = mujoco.MjModel.from_xml_path(binding.simulation_file_path)
     data = mujoco.MjData(model)
     data.qpos[:] = np.linspace(-0.11, 0.11, model.nq)
+    mujoco.mj_forward(model, data)
     expected_qpos = data.qpos.copy()
 
     _FakeViserServer.instances.clear()
@@ -438,7 +528,11 @@ def test_joint_angle_readouts_cover_all_panda_leap_joints_and_qpos_addresses(mon
         MujocoWebViewerConfig(enabled=True, wait_for_client=False),
     )
     server = _FakeViserServer.instances[0]
-    handles = {handle.label: handle for handle in server.gui.numbers}
+    handles = {
+        handle.label: handle
+        for handle in server.gui.numbers
+        if handle.label.endswith("[rad]")
+    }
 
     assert len(handles) == model.njnt == 23
     assert set(handles) == {
@@ -449,6 +543,7 @@ def test_joint_angle_readouts_cover_all_panda_leap_joints_and_qpos_addresses(mon
     assert handles["joint_0 [rad]"].value == round(float(data.qpos[8]), 5)
 
     data.qpos[:] = np.linspace(0.22, -0.22, model.nq)
+    mujoco.mj_forward(model, data)
     updated_qpos = data.qpos.copy()
     visualizer.update()
 
@@ -458,7 +553,7 @@ def test_joint_angle_readouts_cover_all_panda_leap_joints_and_qpos_addresses(mon
         name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, joint_id)
         qpos_address = int(model.jnt_qposadr[joint_id])
         assert handles[f"{name} [rad]"].value == round(float(updated_qpos[qpos_address]), 5)
-    assert server.atomic_count == 1
+    assert server.atomic_count == 2
     visualizer.close()
 
 

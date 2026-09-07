@@ -122,6 +122,7 @@ def test_detection_source_configs_load_detector_calibration():
 
     avp_config = load_detection_source_config("configs/inputs/avp.yaml")
     rgb_config = load_detection_source_config("configs/inputs/rgb.yaml")
+    quest3_config = load_detection_source_config("configs/inputs/quest3.yaml")
 
     assert avp_config.input_device == "avp"
     assert avp_config.rotation_euler_xyz_deg == (0.0, 0.0, 180.0)
@@ -130,6 +131,9 @@ def test_detection_source_configs_load_detector_calibration():
     assert rgb_config.input_device == "rgb"
     assert rgb_config.translation == (0.4, 0.0, 0.0)
     assert rgb_config.use_relative_wrist_alignment is False
+    assert quest3_config.input_device == "quest3"
+    assert len(quest3_config.rotation_euler_xyz_deg) == 3
+    assert quest3_config.use_relative_wrist_alignment is True
 
 
 def test_teleoperation_mode_configs_load_runtime_flags():
@@ -380,6 +384,9 @@ def test_base_config_selects_each_whitelisted_app():
     benchmark_config = compose_hydra_base_config(["app=benchmark"])
     teleop_exe_config = compose_hydra_base_config(["app=teleop_exe"])
     teleop_online_mujoco_config = compose_hydra_base_config(["app=teleop_exe", "teleoperation_modes=online_mujoco"])
+    teleop_quest3_config = compose_hydra_base_config(
+        ["app=teleop_exe", "teleoperation_modes=online_quest3_kinematic"]
+    )
     teleop_offline_mujoco_config = compose_hydra_base_config(["app=teleop_exe", "teleoperation_modes=offline_mujoco"])
 
     assert offline_config["app"]["id"] == "offline_retarget"
@@ -400,6 +407,10 @@ def test_base_config_selects_each_whitelisted_app():
     assert teleop_online_mujoco_config["backend"]["name"] == "mujoco"
     assert teleop_online_mujoco_config["backend"]["command_hz"] == 20.0
     assert "data" not in teleop_online_mujoco_config
+    assert teleop_quest3_config["teleoperation_mode"]["name"] == "online_quest3_kinematic"
+    assert teleop_quest3_config["input"]["input_device"] == "quest3"
+    assert teleop_quest3_config["input"]["hand_side"] == "right"
+    assert teleop_quest3_config["backend"]["name"] == "kinematic"
     assert teleop_offline_mujoco_config["teleoperation_mode"]["name"] == "offline_mujoco"
     assert teleop_offline_mujoco_config["input"]["data"].endswith(".npz")
     assert teleop_offline_mujoco_config["input"]["source_hz"] == 20.0

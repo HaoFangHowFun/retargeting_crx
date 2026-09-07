@@ -100,7 +100,7 @@ def test_canonical_runtime_packages_import_without_optional_dependencies():
         class BlockOptionalImports(importlib.abc.MetaPathFinder):
             \"\"\"Reject optional runtime modules during canonical package imports.\"\"\"
 
-            blocked_roots = {{"avp_stream", "cv2", "mediapipe", "mujoco"}}
+            blocked_roots = {{"aiohttp", "avp_stream", "cv2", "mediapipe", "mujoco"}}
 
             def find_spec(self, fullname, path=None, target=None):
                 \"\"\"Reject blocked roots and defer all other lookups.
@@ -126,6 +126,7 @@ def test_canonical_runtime_packages_import_without_optional_dependencies():
         import teleoperation.flow
         import teleoperation.inputs
         import teleoperation.inputs.avp.offline
+        import teleoperation.inputs.quest3
         import teleoperation.observation_mapping
         import teleoperation.types
         """

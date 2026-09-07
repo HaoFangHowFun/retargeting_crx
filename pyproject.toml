@@ -31,6 +31,9 @@ mujoco-web = [
     "mujoco>=3.6,<4",
     "mjviser>=0.0.14,<0.1",
 ]
+quest3 = [
+    "aiohttp>=3.9,<4",
+]
 replay = [
     "viser",
 ]
@@ -44,6 +47,9 @@ vision = [
 # Install the pinned utils_python submodule as the top-level ``mr_utils`` package.
 where = ["src", "third_party/utils_python"]
 include = ["retargeting*", "retargeting_apps*", "retargeting_ros*", "teleoperation*", "mr_utils*"]
+
+[tool.setuptools.package-data]
+"teleoperation.inputs.quest3" = ["web/*.html", "web/*.js"]
 
 # https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html
 [tool.black]

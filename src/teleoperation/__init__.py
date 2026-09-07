@@ -6,6 +6,7 @@ from teleoperation.observation_mapping import (
     AvpRelativeWristMapper,
     HandObservationMapper,
     IdentityHandObservationMapper,
+    RelativeWristMapper,
     StaticCalibrationMapper,
 )
 from teleoperation.output import QposCommandLimiter, QposOutputFilter
@@ -29,6 +30,7 @@ __all__ = [
     "IdentityHandObservationMapper",
     "QposCommandLimiter",
     "QposOutputFilter",
+    "RelativeWristMapper",
     "RetargetedFrameResult",
     "SensorHandSample",
     "StaticCalibrationMapper",

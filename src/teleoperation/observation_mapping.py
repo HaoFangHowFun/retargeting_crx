@@ -187,8 +187,8 @@ class IdentityHandObservationMapper:
         """
 
 
-class AvpRelativeWristMapper(StaticCalibrationMapper):
-    """Align calibrated AVP wrist translation to the measured robot wrist."""
+class RelativeWristMapper(StaticCalibrationMapper):
+    """Align a calibrated spatial sensor wrist to the measured robot wrist."""
 
     def __init__(
         self,
@@ -198,11 +198,11 @@ class AvpRelativeWristMapper(StaticCalibrationMapper):
         robot_model: Any,
         wrist_frame_name: str,
     ) -> None:
-        """Create an AVP mapper tied to one target robot kinematics model.
+        """Create a relative mapper tied to one target robot kinematics model.
 
         Args:
-            config: AVP sensor-world calibration and relative-alignment flag.
-            human_hand_scale: Scale from AVP hand geometry to target units.
+            config: Spatial sensor-world calibration and relative-alignment flag.
+            human_hand_scale: Scale from sensor hand geometry to target units.
             robot_adaptor: Actuated-to-model qpos adapter.
             robot_model: Kinematics model exposing ``get_frame_pose``.
             wrist_frame_name: Robot wrist frame used as the alignment origin.
@@ -211,8 +211,8 @@ class AvpRelativeWristMapper(StaticCalibrationMapper):
             None.
         """
         super().__init__(config, human_hand_scale)
-        if config.input_device != "avp":
-            raise ValueError("AvpRelativeWristMapper requires an avp detection source config.")
+        if config.input_device not in {"avp", "quest3"}:
+            raise ValueError("RelativeWristMapper requires an avp or quest3 input config.")
         self.robot_adaptor = robot_adaptor
         self.robot_model = robot_model
         self.wrist_frame_name = str(wrist_frame_name)
@@ -223,7 +223,7 @@ class AvpRelativeWristMapper(StaticCalibrationMapper):
         """Capture relative wrist origins using the current measured robot state.
 
         Args:
-            sample: AVP sample selected as the sensor alignment origin.
+            sample: Sensor sample selected as the alignment origin.
             robot_qpos: Current measured actuated-joint positions.
 
         Returns:
@@ -240,10 +240,10 @@ class AvpRelativeWristMapper(StaticCalibrationMapper):
         return True
 
     def map(self, sample: SensorHandSample) -> RetargetingHandObservation | None:
-        """Map AVP hand data using the captured relative wrist translation.
+        """Map spatial hand data using the captured relative wrist translation.
 
         Args:
-            sample: Sensor-normalized AVP sample.
+            sample: Sensor-normalized hand sample.
 
         Returns:
             Canonical robot-world observation, or None for missing hand data.
@@ -252,7 +252,7 @@ class AvpRelativeWristMapper(StaticCalibrationMapper):
         if observation is None or not self.config.use_relative_wrist_alignment:
             return observation
         if self._robot_initial_wrist_pose is None or self._sensor_initial_wrist_pose is None:
-            raise RuntimeError("AVP relative wrist mapping requires successful initialization.")
+            raise RuntimeError("Relative wrist mapping requires successful initialization.")
         wrist_pose_world = np.asarray(observation.wrist_pose_world, dtype=float).copy()
         wrist_pose_world[:3, 3] += (
             self._robot_initial_wrist_pose[:3, 3] - self._sensor_initial_wrist_pose[:3, 3]
@@ -267,7 +267,7 @@ class AvpRelativeWristMapper(StaticCalibrationMapper):
         )
 
     def reset(self) -> None:
-        """Clear AVP and robot wrist origins before a new cycle.
+        """Clear sensor and robot wrist origins before a new cycle.
 
         Args:
             None.
@@ -277,3 +277,25 @@ class AvpRelativeWristMapper(StaticCalibrationMapper):
         """
         self._robot_initial_wrist_pose = None
         self._sensor_initial_wrist_pose = None
+
+
+class AvpRelativeWristMapper(RelativeWristMapper):
+    """Backward-compatible AVP-specific relative wrist mapper."""
+
+    def __init__(
+        self,
+        config: DetectionSourceConfig,
+        human_hand_scale: float,
+        robot_adaptor: RobotAdaptor,
+        robot_model: Any,
+        wrist_frame_name: str,
+    ) -> None:
+        if config.input_device != "avp":
+            raise ValueError("AvpRelativeWristMapper requires an avp detection source config.")
+        super().__init__(
+            config,
+            human_hand_scale,
+            robot_adaptor,
+            robot_model,
+            wrist_frame_name,
+        )

@@ -50,6 +50,7 @@ ROS_IMPORT_ROOTS = frozenset(
 )
 OPTIONAL_RUNTIME_IMPORT_ROOTS = frozenset(
     {
+        "aiohttp",
         "avp_stream",
         "cv2",
         "mediapipe",

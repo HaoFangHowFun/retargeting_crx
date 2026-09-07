@@ -1,0 +1,30 @@
+# @package _global_
+defaults:
+  - /inputs: quest3
+  - /backends: mujoco
+  - _self_
+
+teleoperation_mode:
+  name: online_quest3_mujoco
+  robot_control:
+    use_hardware: false
+    use_virtual_hardware: false
+    use_high_freq_interp: false
+  output:
+    smooth_output_qpos: false
+    smoothing_alpha: 0.3
+  pipeline:
+    realtime: true
+    startup_move_frames: 0
+    ctrlrange_policy: clip
+    use_relative_wrist_alignment: true
+    missing_frame_policy: hold
+
+input:
+  mode: online
+  hand_side: right
+  port: 8765
+  adb: null
+  serial: null
+  max_age_s: 0.15
+  max_frames: null

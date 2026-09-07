@@ -290,18 +290,25 @@ def test_auto_execution_viewer_selects_mjviser_for_mujoco_backend(monkeypatch):
     data = object()
     calls = []
 
-    def create_mujoco_web_visualizer(created_model, created_data, config):
+    def create_mujoco_web_visualizer(
+        created_model,
+        created_data,
+        config,
+        *,
+        wrist_frame_name,
+    ):
         """Record mjviser factory inputs and return a fake visualizer.
 
         Args:
             created_model: Backend MuJoCo model.
             created_data: Backend MuJoCo data.
             config: Viewer configuration.
+            wrist_frame_name: Configured robot wrist body name.
 
         Returns:
             Fake mjviser visualizer.
         """
-        calls.append((created_model, created_data, config))
+        calls.append((created_model, created_data, config, wrist_frame_name))
         return visualizer
 
     flow = _FakeFlow(SimpleNamespace(model=model, data=data))
@@ -318,6 +325,7 @@ def test_auto_execution_viewer_selects_mjviser_for_mujoco_backend(monkeypatch):
     assert attached is visualizer
     assert calls[0][0] is model
     assert calls[0][1] is data
+    assert calls[0][3] == "wrist"
     assert visualizer.update_count == 1
     assert visualizer.wait_for_client_count == 1
     flow.command_observers[0](object())

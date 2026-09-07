@@ -140,7 +140,17 @@ def _attach_mjviser(config_data: dict[str, Any], flow: Any) -> ExecutionVisualiz
     data = getattr(flow.backend, "data", None)
     if model is None or data is None:
         raise TypeError("viewer.type=mjviser requires a MuJoCo backend exposing model and data.")
-    visualizer = create_mujoco_web_visualizer(model, data, viewer_config)
+    wrist_frame_name = "wrist"
+    if "profile" in config_data:
+        profile_config = load_retargeting_profile_config(config_data["profile"])
+        robot_config = load_robot_config(profile_config.robot)
+        wrist_frame_name = robot_config.wrist_frame_name
+    visualizer = create_mujoco_web_visualizer(
+        model,
+        data,
+        viewer_config,
+        wrist_frame_name=wrist_frame_name,
+    )
     visualizer.update()
     flow.add_command_observer(lambda result: visualizer.update())
     flow.add_reset_observer(lambda qpos: visualizer.update())

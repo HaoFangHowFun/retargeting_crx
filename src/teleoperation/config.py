@@ -267,7 +267,7 @@ class DetectionSourceConfig:
         Returns:
             None.
         """
-        if self.input_device not in {"rgb", "avp"}:
+        if self.input_device not in {"rgb", "avp", "quest3"}:
             raise ValueError(f"Unsupported input_device: {self.input_device}")
         if len(self.rotation_euler_xyz_deg) != 3:
             raise ValueError("rotation_euler_xyz_deg must have exactly 3 values.")

@@ -35,7 +35,8 @@ from teleoperation.config import (
 )
 from teleoperation.flow import BatchRetargetFlow, ExecutionFlow
 from teleoperation.inputs.avp import AvpOfflineInput, AvpOnlineInput
-from teleoperation.observation_mapping import AvpRelativeWristMapper, StaticCalibrationMapper
+from teleoperation.inputs.quest3 import Quest3OnlineInput
+from teleoperation.observation_mapping import RelativeWristMapper, StaticCalibrationMapper
 from teleoperation.output import QposCommandLimiter, QposOutputFilter
 
 
@@ -56,8 +57,8 @@ def _build_mapper(
     Returns:
         Mapper matching the selected sensor and alignment semantics.
     """
-    if detection_config.input_device == "avp":
-        return AvpRelativeWristMapper(
+    if detection_config.input_device in {"avp", "quest3"}:
+        return RelativeWristMapper(
             config=detection_config,
             human_hand_scale=robot_config.human_hand_scale,
             robot_adaptor=robot_adaptor,
@@ -142,8 +143,8 @@ def _resolve_input_config(config_data: dict[str, Any]) -> tuple[DetectionSourceC
         raise ValueError("Execution config requires an input mapping.")
     detection_config = load_detection_source_config(input_source)
     input_data = input_source if isinstance(input_source, dict) else {}
-    if detection_config.input_device != "avp":
-        raise ValueError("Execution apps currently require an avp input source.")
+    if detection_config.input_device not in {"avp", "quest3"}:
+        raise ValueError("Execution apps currently require an avp or quest3 input source.")
     return detection_config, input_data
 
 
@@ -264,6 +265,8 @@ def build_execution_flow(config: Any) -> ExecutionFlow:
     if input_mode not in {"online", "offline"}:
         raise ValueError(f"input.mode must be 'online' or 'offline', got {input_mode!r}.")
     if input_mode == "offline":
+        if detection_config.input_device != "avp":
+            raise ValueError("Offline execution currently requires an avp input source.")
         data_file = _legacy_value(config_data, input_data, "data")
         if data_file is None:
             raise ValueError("Offline input requires input.data.")
@@ -281,11 +284,23 @@ def build_execution_flow(config: Any) -> ExecutionFlow:
             end=int(_legacy_value(config_data, input_data, "end", -1)),
         )
         max_frames = None
-    else:
+    elif detection_config.input_device == "avp":
         avp_ip = _legacy_value(config_data, input_data, "avp_ip")
         if avp_ip is None:
             raise ValueError("Online input requires input.avp_ip.")
         hand_input = AvpOnlineInput(str(avp_ip))
+        max_frames_value = _legacy_value(config_data, input_data, "max_frames")
+        max_frames = None if max_frames_value is None else int(max_frames_value)
+    else:
+        adb = _legacy_value(config_data, input_data, "adb")
+        serial = _legacy_value(config_data, input_data, "serial")
+        hand_input = Quest3OnlineInput(
+            hand_side=str(_legacy_value(config_data, input_data, "hand_side", "right")),
+            port=int(_legacy_value(config_data, input_data, "port", 8765)),
+            adb=None if adb is None else str(adb),
+            serial=None if serial is None else str(serial),
+            max_age_s=float(_legacy_value(config_data, input_data, "max_age_s", 0.15)),
+        )
         max_frames_value = _legacy_value(config_data, input_data, "max_frames")
         max_frames = None if max_frames_value is None else int(max_frames_value)
     return ExecutionFlow(

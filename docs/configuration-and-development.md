@@ -138,7 +138,7 @@ Python-level ROS integration lives in `src/retargeting_ros/`. Compatibility scri
 
 ## Live Teleoperation
 
-Live teleoperation is an advanced path. It may require ROS, a camera or Vision Pro live stream, optional visualization dependencies, and robot-specific setup.
+Live teleoperation is an advanced path. It may require ROS, a camera, Vision Pro, or Quest 3 live stream, optional visualization dependencies, and robot-specific setup.
 
 The legacy compatibility entrypoint is:
 
@@ -153,6 +153,7 @@ Optional live-input dependencies:
 
 - RGB hand detection: `pip install -e ".[vision]"`
 - Vision Pro streaming: `pip install -e ".[avp]"`
+- Quest 3 USB/WebXR streaming: `pip install -e ".[quest3]"`
 - MuJoCo-related paths: `pip install -e ".[mujoco]"`
 - MuJoCo Web visualization: `pip install -e ".[mujoco-web]"`
 - ROS/RViz/hardware: ROS2 Humble workspace and robot drivers
@@ -228,8 +229,9 @@ HandInput -> SensorHandSample -> HandObservationMapper -> RetargetingHandObserva
 
 `ExecutionFlow` is the only stateful owner of this sequence. It also owns mapping initialization, missing-input
 hold behavior, wall-clock pacing, source/command counters, passive observers, and the reset contract. AVP live and
-archived acquisition share `teleoperation.inputs.avp.common.decode_avp_sample`; the optional `avp_stream` dependency
-is imported only by `AvpOnlineInput.open()`. Offline artifact generation uses `BatchRetargetFlow`, skips missing
+archived acquisition share `teleoperation.inputs.avp.common.decode_avp_sample`; Quest transport and conversion live
+under `teleoperation.inputs.quest3`. The optional `avp_stream` and `aiohttp` dependencies are imported only by live
+input paths. Offline artifact generation uses `BatchRetargetFlow`, skips missing
 samples, and never creates a robot backend or execution result.
 
 After installation, both entry forms below use the same app registry and Hydra overrides:
@@ -271,14 +273,29 @@ Default tests should not start ROS, RViz, cameras, Vision Pro live streaming, re
 
 `app=teleop_exe` is the unified execution path, not a saved-trajectory replay. Teleoperation setup selection lives in
 `teleoperation_modes`; each setup composes `input`, `backend`, and pipeline policy. The same `ExecutionFlow` runs
-online AVP, archived AVP, MuJoCo, and pure kinematic execution. For live AVP into MuJoCo:
+online AVP, online Quest 3, archived AVP, MuJoCo, and pure kinematic execution. For live AVP into MuJoCo:
 
 ```bash
 python -m retargeting_apps.main app=teleop_exe \
   teleoperation_modes=online_mujoco input.avp_ip=192.168.52.6
 ```
 
-The app takes the latest AVP frame, retargets it once, applies the actuator-range policy, sends the resulting qpos to
+For Quest 3, connect an ADB-authorized headset over USB and run the kinematic
+backend before attempting MuJoCo or hardware:
+
+```bash
+python -m retargeting_apps.main app=teleop_exe \
+  teleoperation_modes=online_quest3_kinematic
+```
+
+`Quest3OnlineInput` owns the local WebXR receiver, ADB port forwarding, and
+Quest Browser launch. It selects the newest complete configured hand, rejects
+stale frames, converts WebXR's 25 joints to the 21-joint MANO order, then feeds
+the same relative-wrist mapper and 23-DOF Panda+LEAP solver used by the other
+execution modes. Runtime overrides include `input.hand_side`, `input.port`,
+`input.adb`, `input.serial`, `input.max_age_s`, and `input.max_frames`.
+
+The app takes the latest selected live-input frame, retargets it once, applies the actuator-range policy, sends the resulting qpos to
 the configured backend, and advances one 20 Hz command period before accepting the next frame. With the default
 `startup_move_frames=0`, there is no explicit target-speed limit. The MuJoCo backend's `0.002 s` physics timestep
 makes one command period exactly 25 MuJoCo steps.
@@ -328,6 +345,12 @@ The returned mjviser tab group is extended with a read-only `Joint angles` tab. 
 MuJoCo joint ids, resolves each hinge joint through `model.jnt_qposadr`, and displays the corresponding actual
 `data.qpos` value in radians. The current Panda+Leap MJCF has 23 hinge joints, all of which are updated atomically
 after every viewer frame. No input callback is registered, so these fields cannot modify simulation state.
+
+The MuJoCo viewer also overlays the mapped Quest target wrist and the actual robot wrist. Both use the standard
+red-X, green-Y, blue-Z axes; the target has a yellow origin and `Quest wrist (target)` label, while the actual frame
+has a magenta origin and `Panda wrist (actual)` label. The read-only `Wrist diagnostics` tab reports their Euclidean
+origin distance in centimetres and shortest relative rotation angle in degrees. These diagnostics are passive and
+do not alter retargeting, commands, or MuJoCo advancement.
 
 Both `mjviser` and standard `viser` execution adapters share the same human-hand renderer. It transforms each
 canonical `RetargetingHandObservation` into robot-world MANO keypoints, skeleton segments, and a wrist frame, then
