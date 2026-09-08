@@ -104,18 +104,19 @@ class Retargeter:
         self.arm_dof = self.retargeting_config.arm_dof
 
         benchmark_config = robot_config.benchmark
-        thumb_fingertip = benchmark_config.thumb_fingertip
-        primary_fingertips = benchmark_config.primary_fingertips
-        self.human_fingertip_indices = np.asarray(
-            [thumb_fingertip.human_tip_index, *[item.human_tip_index for item in primary_fingertips]], dtype=int
-        )
-        self.human_fingertip_base_indices = np.asarray(
-            [
-                thumb_fingertip.human_direction_base_index,
-                *[item.human_direction_base_index for item in primary_fingertips],
-            ],
-            dtype=int,
-        )
+        self.arm_only = not benchmark_config.fingertips
+        if self.arm_only:
+            self.human_fingertip_indices = np.empty(0, dtype=int)
+            self.human_fingertip_base_indices = np.empty(0, dtype=int)
+        else:
+            thumb_fingertip = benchmark_config.thumb_fingertip
+            primary_fingertips = benchmark_config.primary_fingertips
+            self.human_fingertip_indices = np.asarray(
+                [thumb_fingertip.human_tip_index, *[item.human_tip_index for item in primary_fingertips]], dtype=int
+            )
+            self.human_fingertip_base_indices = np.asarray(
+                [thumb_fingertip.human_direction_base_index, *[item.human_direction_base_index for item in primary_fingertips]], dtype=int
+            )
 
         target_config = profile_config.target
         target_link_pairs = target_config.link_pairs
@@ -139,7 +140,7 @@ class Retargeter:
             solver=self.solver_config.name,
         )
         self.arm_optimizer = None
-        if self.retarget_wrist_method == "separate":
+        if self.retarget_wrist_method == "separate" or self.arm_only:
             self.arm_optimizer = optimizer_class(
                 robot_adaptor=robot_adaptor,
                 targets={
@@ -281,11 +282,27 @@ class Retargeter:
         temporal_reference = self.previous_qpos if previous_qpos is None else np.asarray(previous_qpos, dtype=float)
         hand_kps_in_world = transformPositions(observation.keypoints_wrist, target_frame_pose_inv=observation.wrist_pose_world)
         wrist_quat = quatXYZW2WXYZ(sciR.from_matrix(observation.wrist_pose_world[:3, :3]).as_quat())
-        ref_values = self._build_ref_values(hand_kps_in_world, wrist_quat, temporal_reference)
         started_at = time.perf_counter()
-        if self.retarget_wrist_method == "joint":
-            qpos = self.optimizer.retarget(ref_values)
+        if self.arm_only:
+            if self.arm_optimizer is None:
+                raise ValueError("Arm-only retargeting requires an arm optimizer.")
+            qpos = self.arm_optimizer.retarget({
+                "links_vec": np.asarray([hand_kps_in_world[self.retargeting_config.human_wrist_index, :]]),
+                "wrist_quat": wrist_quat,
+                "qpos_doa": self.qpos_init.copy(),
+                "qpos_doa_last": temporal_reference.copy(),
+                "weights": {
+                    "links_vec": np.asarray([self.objective_config.weights.arm_link_vector]),
+                    "wrist_rot": self.objective_config.weights.arm_wrist_rotation,
+                    "joint_pos": np.asarray(self.retargeting_config.joint_position_weights),
+                    "joint_vel": np.asarray(self.retargeting_config.joint_velocity_weights),
+                },
+            })
         else:
+            ref_values = self._build_ref_values(hand_kps_in_world, wrist_quat, temporal_reference)
+        if not self.arm_only and self.retarget_wrist_method == "joint":
+            qpos = self.optimizer.retarget(ref_values)
+        elif not self.arm_only:
             if self.arm_optimizer is None:
                 raise ValueError("Separate wrist retargeting requires an arm optimizer.")
             arm_ref_values = {

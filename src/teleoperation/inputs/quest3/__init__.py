@@ -9,7 +9,7 @@ from teleoperation.inputs.quest3.model import (
     HeadPose,
     JointPose,
 )
-from teleoperation.inputs.quest3.online import Quest3OnlineInput
+from teleoperation.inputs.quest3.online import Quest3BimanualOnlineInput, Quest3OnlineInput
 
 __all__ = [
     "HAND_SIDES",
@@ -20,6 +20,7 @@ __all__ = [
     "HeadPose",
     "JointPose",
     "Quest3OnlineInput",
+    "Quest3BimanualOnlineInput",
     "Quest3Receiver",
     "Quest3UsbSession",
     "QuestUsbBridge",

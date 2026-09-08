@@ -1,0 +1,17 @@
+# @package robot
+# Visual-only left CRX + Co-act placeholder; opening is held until gripper mapping is added.
+name: crx5ia_coact_placeholder
+model:
+  type: urdf
+  path: assets/robots/crx5ia_coact_placeholder/urdf/crx5ia_coact_placeholder.urdf
+  path_is_symlink: false
+actuated_joints: [J1, J2, J3, J4, J5, J6, coact_opening]
+# Matches dual_crx.srdf left_arm/home: J1..J6 = [0, 0, 0, 0, -90, 0] deg.
+initial_qpos: [0, 0, 0, 0, -1.5707963267948966, 0, 0]
+visual_frame_names: [base_link, wbase, flange, fanuc_flange, coact_gripper_body, coact_left_jaw, coact_right_jaw]
+wrist_frame_name: flange
+human_hand_scale: 1.0
+benchmark_required: false
+benchmark:
+  wrist_link_name: flange
+  fingertips: []

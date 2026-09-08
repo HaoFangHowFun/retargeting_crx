@@ -1,0 +1,19 @@
+# Heterogeneous dual-arm Quest setup. Commands are concatenated left then right.
+name: crx5ia_coact_leap
+left:
+  robot: configs/robots/crx5ia_coact_placeholder.yaml
+  profile: configs/retargeting_profiles/wrist_pose_crx5ia_coact_placeholder.yaml
+  placement:
+    # Matches dual_crx.urdf.xacro left_xyz/left_rpy and table_frame parent.
+    position: [0.0, 0.3, 0.0]
+    rpy: [0.0, 0.0, 0.0]
+right:
+  robot: configs/robots/crx5ia_leap_paxini.yaml
+  profile: configs/retargeting_profiles/vector_wrist_joint_crx5ia_leap_paxini.yaml
+  placement:
+    position: [0.0, -0.3, 0.0]
+    rpy: [0.0, 0.0, -1.5707963267948966]
+input:
+  config: configs/inputs/quest3.yaml
+  port: 8765
+  max_age_s: 0.15

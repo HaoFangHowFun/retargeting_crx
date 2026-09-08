@@ -1,0 +1,19 @@
+schema_version: 1
+robot: crx5ia_coact_placeholder
+format: visual_placeholder_robot_assets
+entrypoints:
+  urdf: urdf/crx5ia_coact_placeholder.urdf
+actuated_joints:
+  - J1
+  - J2
+  - J3
+  - J4
+  - J5
+  - J6
+  - coact_opening
+gripper:
+  model: Co-act EGP-C 40 (unverified suffix)
+  opening_range_m: [0.0, 0.012]
+  geometry_status: placeholder_only
+  collision_validated: false
+  tcp_validated: false

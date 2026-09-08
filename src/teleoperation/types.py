@@ -87,6 +87,26 @@ class SensorHandSample:
 
 
 @dataclass(frozen=True)
+class BimanualSensorHandSample:
+    """One synchronized Quest frame decoded into left and right hand samples."""
+
+    left: SensorHandSample
+    right: SensorHandSample
+
+    @property
+    def source_index(self) -> int | None:
+        return self.left.source_index if self.left.source_index is not None else self.right.source_index
+
+    @property
+    def timestamp(self) -> float | None:
+        return self.left.timestamp if self.left.timestamp is not None else self.right.timestamp
+
+    @property
+    def complete(self) -> bool:
+        return self.left.has_hand and self.right.has_hand
+
+
+@dataclass(frozen=True)
 class RetargetedFrameResult:
     """Backend-neutral result for one successfully retargeted source frame."""
 

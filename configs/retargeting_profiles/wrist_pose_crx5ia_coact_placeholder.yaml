@@ -1,0 +1,20 @@
+# @package profile
+# Wrist-only arm objective. coact_opening remains at its temporal reference until
+# Quest thumb-index gripper mapping is implemented in a later slice.
+name: wrist_pose_crx5ia_coact_placeholder
+robot: configs/robots/crx5ia_coact_placeholder.yaml
+method: configs/retargeting_methods/vector_wrist_joint.yaml
+target:
+  wrist_link_name: flange
+  link_pairs: [[world, flange]]
+objective:
+  weights:
+    arm_link_vector: 10.0
+    arm_wrist_rotation: 1.0
+retargeting:
+  arm_dof: 6
+  human_wrist_index: 0
+  joint_position_weights: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.0]
+  joint_velocity_weights: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.0]
+teleoperation:
+  max_joint_speed: [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
