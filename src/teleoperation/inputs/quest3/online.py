@@ -99,6 +99,11 @@ class Quest3BimanualOnlineInput:
     def device_serial(self) -> str | None:
         return None if self._session is None else self._session.serial
 
+    @property
+    def stats(self) -> Any | None:
+        """Return receiver counters for live diagnostics."""
+        return None if self._session is None else self._session.stats
+
     def open(self) -> None:
         if self._session is not None:
             return

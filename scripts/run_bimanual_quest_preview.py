@@ -92,21 +92,39 @@ def main() -> None:
         if root is not None:
             root.position = tuple(float(value) for value in arm["placement"]["position"])
             root.wxyz = np.roll(Rotation.from_euler("xyz", arm["placement"]["rpy"]).as_quat(), 1)
+    # Always show the configured dual_crx home pose before Quest tracking starts.
+    left_urdf.update_cfg(np.asarray(left_robot.initial_qpos, dtype=float))
+    right_urdf.update_cfg(np.asarray(right_robot.initial_qpos, dtype=float))
     print(f"Bimanual Quest preview listening on http://localhost:{args.port}")
     print("Left hand -> Co-act arm; right hand -> LEAP arm. No robot hardware is commanded. Ctrl+C to stop.")
     source.open()
+    last_report = time.monotonic()
+    last_sequence: int | None = None
     try:
         while True:
             sample = source.read()
+            frame = sample.left.raw if sample.left.raw is not None else sample.right.raw
+            sequence = getattr(frame, "sequence", None)
             if not pipeline.initialized:
                 if pipeline.initialize(sample, left_robot.initial_qpos, right_robot.initial_qpos):
-                    left_urdf.update_cfg(left_robot.initial_qpos)
-                    right_urdf.update_cfg(right_robot.initial_qpos)
-                continue
-            result = pipeline.step(sample)
-            if result is not None:
-                left_urdf.update_cfg(result.left_qpos)
-                right_urdf.update_cfg(result.right_qpos)
+                    print(f"Quest tracking initialized at frame {sequence}; both hands are available.")
+            elif sequence != last_sequence:
+                result = pipeline.step(sample)
+                if result is not None:
+                    left_urdf.update_cfg(result.left_qpos)
+                    right_urdf.update_cfg(result.right_qpos)
+            last_sequence = sequence if sequence is not None else last_sequence
+            now = time.monotonic()
+            if now - last_report >= 1.0:
+                stats = source.stats
+                tracked = getattr(frame, "both_hands_tracked", False)
+                print(
+                    f"Quest frames={getattr(stats, 'accepted', 0)} "
+                    f"connections={getattr(stats, 'connections', 0)} "
+                    f"latest_sequence={sequence} both_hands_tracked={tracked} "
+                    f"initialized={pipeline.initialized}"
+                )
+                last_report = now
             time.sleep(0.001)
     except KeyboardInterrupt:
         pass
