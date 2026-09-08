@@ -18,9 +18,11 @@ from retargeting.config import (
 )
 from retargeting.core import Retargeter
 from retargeting.core.kinematics import RobotAdaptor, RobotPinocchio
+from retargeting.core.types import RetargetingHandObservation
 from retargeting_apps.config import MujocoWebViewerConfig, resolve_project_path
 from retargeting_apps.visualization.execution.viser import _load_viser_dependencies
 from retargeting_apps.visualization.viser_scene import configure_initial_camera
+from retargeting_apps.visualization.viser_scene import ViserHandObservationRenderer
 from teleoperation.bimanual import BimanualRetargetingPipeline
 from teleoperation.config import load_detection_source_config
 from teleoperation.inputs.quest3 import Quest3BimanualOnlineInput
@@ -48,6 +50,24 @@ def _build_arm(arm: dict, detection_config):
         wrist_frame_name=robot.wrist_frame_name,
     )
     return robot, model, retargeter, mapper
+
+
+def _placement_pose(arm: dict) -> np.ndarray:
+    pose = np.eye(4, dtype=float)
+    pose[:3, :3] = Rotation.from_euler("xyz", arm["placement"]["rpy"]).as_matrix()
+    pose[:3, 3] = np.asarray(arm["placement"]["position"], dtype=float)
+    return pose
+
+
+def _to_scene_observation(observation: RetargetingHandObservation, placement: np.ndarray) -> RetargetingHandObservation:
+    return RetargetingHandObservation(
+        keypoints_wrist=observation.keypoints_wrist,
+        wrist_pose_world=placement @ observation.wrist_pose_world,
+        timestamp=observation.timestamp,
+        handedness=observation.handedness,
+        keypoint_2d=observation.keypoint_2d,
+        raw=observation.raw,
+    )
 
 
 def main() -> None:
@@ -87,6 +107,10 @@ def main() -> None:
     configure_initial_camera(server, position=(1.1, 1.1, 0.9), look_at=(0.0, 0.0, 0.35))
     left_urdf = ViserUrdf(server, Path(left_robot.robot_file_path), root_node_name="/left_arm", load_meshes=True, load_collision_meshes=False)
     right_urdf = ViserUrdf(server, Path(right_robot.robot_file_path), root_node_name="/right_arm", load_meshes=True, load_collision_meshes=False)
+    left_hand_renderer = ViserHandObservationRenderer(server, point_size=0.012, root_node_name="/quest_hand/left")
+    right_hand_renderer = ViserHandObservationRenderer(server, point_size=0.012, root_node_name="/quest_hand/right")
+    left_placement = _placement_pose(data["left"])
+    right_placement = _placement_pose(data["right"])
     for urdf, arm in ((left_urdf, data["left"]), (right_urdf, data["right"])):
         root = getattr(urdf, "_visual_root_frame", None)
         if root is not None:
@@ -108,7 +132,13 @@ def main() -> None:
             if not pipeline.initialized:
                 if pipeline.initialize(sample, left_robot.initial_qpos, right_robot.initial_qpos):
                     print(f"Quest tracking initialized at frame {sequence}; both hands are available.")
-            elif sequence != last_sequence:
+            if pipeline.initialized and sequence != last_sequence:
+                left_observation = left_mapper.map(sample.left)
+                right_observation = right_mapper.map(sample.right)
+                if left_observation is not None:
+                    left_hand_renderer.update_observation(_to_scene_observation(left_observation, left_placement))
+                if right_observation is not None:
+                    right_hand_renderer.update_observation(_to_scene_observation(right_observation, right_placement))
                 result = pipeline.step(sample)
                 if result is not None:
                     left_urdf.update_cfg(result.left_qpos)
