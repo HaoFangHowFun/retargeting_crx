@@ -176,3 +176,6 @@ def run(config: Any, argv: list[str]) -> dict[str, Any]:
     finally:
         if visualizer is not None:
             visualizer.close()
+        close = getattr(flow.backend, "close", None)
+        if close is not None:
+            close()

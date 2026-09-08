@@ -160,6 +160,35 @@ Optional live-input dependencies:
 
 ## Real Robot Control
 
+### dual_crx_ros2 integration
+
+The CRX+LEAP profile can publish directly to the dual-crx ROS 2 gateway when
+the retargeting process runs in a Python 3.12 environment that can import both
+ROS Jazzy and the retargeting dependencies. Select the opt-in backend with:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source ~/ws_fanuc/install/setup.bash
+source ~/dual_crx_ros2/install/setup.bash
+python -m retargeting_apps.main app=teleop_exe \
+  retargeting_profiles=vector_wrist_joint_crx5ia_leap_paxini \
+  teleoperation_modes=real_world \
+  backend=dual_crx
+```
+
+The backend acquires the RIGHT lease, enables the hand and teleoperation
+session, publishes `dual_crx_interfaces/msg/TeleopCommand` at the configured
+rate, renews the lease, and stops/releases on shutdown. It is intentionally
+not the default backend. Verify the combined interpreter first with:
+
+```bash
+python -c "import rclpy, hydra, pinocchio, nlopt; print('ROS + retargeting imports OK')"
+```
+
+Physical use still requires the installed hand model, bounds, frames, and
+FANUC command path to be validated. Use the dual-crx fake launch for the first
+end-to-end run.
+
 Real robot control is lab-specific and is not required for offline replay. Confirm robot safety, ROS networking, drivers, and emergency-stop procedures before running any hardware command.
 
 The original lab setup targeted a Franka Panda arm with a Leap hand. The IP addresses below are historical examples from that environment, not portable defaults.

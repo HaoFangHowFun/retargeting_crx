@@ -1,0 +1,6 @@
+# @package backend
+name: dual_crx
+command_hz: 20.0
+realtime: true
+ctrlrange_policy: error
+startup_move_frames: 0
