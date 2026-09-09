@@ -41,6 +41,8 @@ class DualCrxRobotBackend:
         self._thread.start()
         self._state_lock = threading.Lock()
         self._state = None
+        self._hand_state = None
+        self._feedback_at = {"arm": 0.0, "hand": 0.0}
         self._target = values.copy()
         self._actual = values.copy()
         self._period = float(control_period)
@@ -61,9 +63,14 @@ class DualCrxRobotBackend:
         self._heartbeat = self._node.create_timer(1.0, self._renew_lease)
         self._started = False
         self._acquired = False
+        self._hand_requested = False
         self._has_executed = False
         self._startup_timer = None
-        self._start()
+        try:
+            self._start()
+        except BaseException:
+            self.close()
+            raise
 
     @property
     def control_period(self) -> float:
@@ -73,14 +80,21 @@ class DualCrxRobotBackend:
         with self._state_lock:
             self._state = message
             values = dict(zip(message.right_joints.name, message.right_joints.position))
-            if all(name in values for name in DUAL_CRX_NAMES[:6]):
+            self._feedback_at["arm"] = 0.0
+            if message.fresh and all(name in values and np.isfinite(values[name]) for name in DUAL_CRX_NAMES[:6]):
                 self._actual[:6] = [values[name] for name in DUAL_CRX_NAMES[:6]]
+                self._feedback_at["arm"] = time.monotonic()
 
     def _hand_state_cb(self, message: Any) -> None:
         with self._state_lock:
+            self._hand_state = message
             values = dict(zip(message.joints.name, message.joints.position))
-            if all(name in values for name in DUAL_CRX_NAMES[6:]):
+            self._feedback_at["hand"] = 0.0
+            stamp = message.joints.header.stamp
+            age = self._node.get_clock().now().nanoseconds / 1e9 - stamp.sec - stamp.nanosec / 1e9
+            if message.healthy and -.02 <= age <= .3 and all(name in values and np.isfinite(values[name]) for name in DUAL_CRX_NAMES[6:]):
                 self._actual[6:] = [values[name] for name in DUAL_CRX_NAMES[6:]]
+                self._feedback_at["hand"] = time.monotonic()
 
     def _call(self, key: str, request: Any, timeout: float = 5.0) -> Any:
         client = self._clients[key]
@@ -99,6 +113,13 @@ class DualCrxRobotBackend:
             raise RuntimeError(result.message)
         return result
 
+    def _seed_from_feedback(self) -> None:
+        with self._state_lock:
+            now = time.monotonic()
+            if any(stamp <= 0 or now - stamp > .5 for stamp in self._feedback_at.values()):
+                raise RuntimeError("fresh complete arm and hand feedback required for startup")
+            self._target = self._actual.copy()
+
     def _start(self) -> None:
         deadline = time.monotonic() + 10.0
         while self._state is None and time.monotonic() < deadline:
@@ -107,7 +128,14 @@ class DualCrxRobotBackend:
             raise RuntimeError("timed out waiting for dual-crx state")
         self._call("acquire", self._request("acquire"))
         self._acquired = True
+        self._hand_requested = True
         self._call("hand", self._request("hand"))
+        deadline = time.monotonic() + 5.0
+        while (self._hand_state is None or not self._hand_state.enabled) and time.monotonic() < deadline:
+            time.sleep(.01)
+        if self._hand_state is None or not self._hand_state.enabled:
+            raise RuntimeError("timed out waiting for enabled hand feedback")
+        self._seed_from_feedback()
         deadline = time.monotonic() + 10.0
         while True:
             try:
@@ -200,17 +228,25 @@ class DualCrxRobotBackend:
     def close(self) -> None:
         if self._startup_timer is not None:
             self._startup_timer.cancel()
-        if self._started:
+        # Cleanup also covers partial startup, including hand enable followed by
+        # a rejected gateway enable. Each action is attempted independently.
+        from dual_crx_interfaces.srv import SoftwareStop, ReleaseControl
+        from std_srvs.srv import SetBool
+        actions = []
+        if self._acquired:
+            actions.append(("stop", SoftwareStop.Request(reason="retargeting shutdown")))
+        if self._hand_requested:
+            actions.append(("hand", SetBool.Request(data=False)))
+        if self._acquired:
+            actions.append(("release", ReleaseControl.Request(client_id=self._client_id, arm_scope=self._scope)))
+        for key, request in actions:
             try:
-                from dual_crx_interfaces.srv import SoftwareStop, ReleaseControl
-                self._call("stop", SoftwareStop.Request(reason="retargeting shutdown"))
-                from dual_crx_interfaces.srv import SetTeleop
-                self._call("teleop", SetTeleop.Request(client_id=self._client_id, enabled=False))
-                self._call("release", ReleaseControl.Request(client_id=self._client_id, arm_scope=self._scope))
-            finally:
-                self._started = False
-                self._acquired = False
+                self._call(key, request)
+            except Exception as exc:
+                self._node.get_logger().error(f"dual-crx cleanup {key} failed: {exc}")
+        self._started = self._acquired = self._hand_requested = False
         self._executor.shutdown()
+        self._thread.join(timeout=2.0)
         self._node.destroy_node()
 
 

@@ -415,3 +415,30 @@ sleep, so its cost is included in realtime pacing without changing simulated tim
 viewer remains bound to the existing `MjModel` and `MjData`; the app publishes the reset state before processing the
 next cycle. MuJoCo simulation time restarts at zero for every cycle, and Ctrl+C closes the viewer without applying
 `keep_open_after_completion`.
+
+
+Physical dual-CRX startup (2026-09-08): the backend requires fresh complete arm/hand
+feedback and seeds its startup target from measured positions after hand activation.
+It holds that pose while waiting for the first input rather than commanding the
+profile's simulation home. Startup failure and close attempt software stop, hand
+torque disable and lease release. Hardware authority remains an operator-controlled
+step in the dual-crx stack. Focused verification: `tests/test_dual_crx_startup.py`.
+
+
+### Live Quest checkpoint (2026-09-08)
+
+The operator reports successful brief physical Quest teleoperation. The supplied
+log at 1788919906.231 records a right_J6 position-limit warning, followed at
+1788919906.241 by the gateway stopping on Servo warning/halt or stale status.
+Controller-loop overruns also occurred (one reported loop about 8.15 ms against
+a 2 ms period); sustained timing and communication remain unresolved. This is
+a working checkpoint, not full-workspace or long-duration acceptance. J6 bounds
+remain -225 to +225 degrees, with the existing Servo 0.12 rad margin unchanged.
+No collision-model or joint-limit expansion was made.
+
+The existing browser viewer can be explicitly selected with
+`viewer.enabled=true viewer.type=viser viewer.wait_for_client=false`; open
+http://localhost:9219. With `backends=dual_crx` the command still controls hardware.
+Use `backends=kinematic` for visualization without physical commands. The viewer
+command was inspected in source; successful live viewer operation is not yet
+confirmed. Run launches in foreground terminals at the operator's request.
