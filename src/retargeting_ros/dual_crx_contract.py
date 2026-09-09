@@ -75,6 +75,24 @@ def to_bimanual_crx_command(
     return BIMANUAL_CRX_NAMES, to_bimanual_crx_positions(qpos)
 
 
+def split_bimanual_crx_positions(
+    qpos: Sequence[float] | np.ndarray,
+) -> tuple[tuple[float, ...], tuple[float, ...]]:
+    """Split a validated left-then-right vector into two 22-DOF commands."""
+    values = to_bimanual_crx_positions(qpos)
+    return values[:22], values[22:]
+
+
+def join_bimanual_crx_positions(
+    left_qpos: Sequence[float] | np.ndarray,
+    right_qpos: Sequence[float] | np.ndarray,
+) -> tuple[float, ...]:
+    """Join two 22-DOF robot vectors in the canonical bimanual order."""
+    left = to_dual_crx_positions(left_qpos)
+    right = to_dual_crx_positions(right_qpos)
+    return to_bimanual_crx_positions(left + right)
+
+
 def to_dual_crx_command(
     qpos: Sequence[float] | np.ndarray,
     *,
@@ -96,6 +114,8 @@ __all__ = [
     "BIMANUAL_CRX_NAMES",
     "to_bimanual_crx_command",
     "to_bimanual_crx_positions",
+    "split_bimanual_crx_positions",
+    "join_bimanual_crx_positions",
     "to_dual_crx_command",
     "to_dual_crx_names",
     "to_dual_crx_positions",

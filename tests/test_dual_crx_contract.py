@@ -10,6 +10,8 @@ from retargeting_ros.dual_crx_contract import (
     to_dual_crx_positions,
     to_bimanual_crx_command,
     to_bimanual_crx_positions,
+    split_bimanual_crx_positions,
+    join_bimanual_crx_positions,
 )
 
 
@@ -46,6 +48,10 @@ def test_bimanual_command_uses_left_then_right_order():
     assert names[22:28] == tuple(f"right_J{i}" for i in range(1, 7))
     assert names[28:] == tuple(f"right_leap_joint_{i}" for i in range(16))
     assert values == tuple(qpos.tolist())
+    left, right = split_bimanual_crx_positions(qpos)
+    assert left == tuple(qpos[:22].tolist())
+    assert right == tuple(qpos[22:].tolist())
+    assert join_bimanual_crx_positions(left, right) == values
 
 
 @pytest.mark.parametrize("qpos", [np.zeros(43), np.zeros(45), np.full(44, np.nan)])
