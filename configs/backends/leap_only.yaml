@@ -1,0 +1,6 @@
+# @package backend
+name: leap_only
+command_hz: 20.0
+realtime: true
+ctrlrange_policy: clip
+startup_move_frames: 0
