@@ -128,12 +128,9 @@ arms. Each arm has its own initial pose. The left-hand mount compensates for
 its different palm origin using the right-hand mount as a reference; see the
 [left-hand asset notes](assets/robots/crx5ia_leap_paxini_left/README.md).
 
-**Mount orientation / merge note:** This branch's LEAP mounts have not yet
-received the 180-degree flip. The maintainer reports that the physical-test
-version on `main` already includes that flip. When merging, follow `main`'s
-mount orientation and re-evaluate the left-hand translation compensation and
-flange-to-wrist alignment against it. Do not overwrite the flipped mount with
-this branch's current transform or assume its offset remains valid unchanged.
+**Mount orientation:** The merged physical-test mount uses the 180-degree
+right-hand/EEF flip from `main`; re-check the left-hand translation compensation
+and flange-to-wrist alignment whenever the mount transform changes.
 
 Run these commands from the repository root with the project environment
 activated. On Howard's WSL installation, activate the existing environment with:
@@ -185,6 +182,53 @@ python scripts/run_bimanual_quest_preview.py \
 
 Both hands must be tracked to initialize. All three previews use Viser and
 send no commands to robot hardware. Press `Ctrl+C` to stop.
+## Dual-CRX Mock Integration
+
+The CRX+LEAP retargeting profile can be exercised with a Quest and the
+software-only `dual_crx_ros2` mock stack. This path does not connect to or move
+physical hardware.
+
+Start the mock ROS gateway in one terminal:
+
+```bash
+cd /home/msc-crx/dual_crx_ros2
+export PATH="/usr/bin:/bin:$PATH"
+source scripts/codex_env.sh
+ros2 launch dual_crx_bringup leaphand_tele_mock.launch.py
+```
+
+In a second terminal, start the Quest retargeting process:
+
+```bash
+cd /home/msc-crx/retargeting_crx
+source /home/msc-crx/miniconda3/etc/profile.d/conda.sh
+conda activate retargeting_ros
+source /opt/ros/jazzy/setup.bash
+source /home/msc-crx/ws_fanuc/install/setup.bash
+source /home/msc-crx/dual_crx_ros2/install/setup.bash
+
+PYTHONPATH="$PWD/src:$PYTHONPATH" \
+python -m retargeting_apps.main \
+  app=teleop_exe \
+  retargeting_profiles=vector_wrist_joint_crx5ia_leap_paxini \
+  teleoperation_modes=real_world \
+  +inputs=quest3 \
+  +backends=dual_crx \
+  viewer.enabled=true \
+  viewer.type=viser \
+  viewer.port=9219 \
+  viewer.wait_for_client=false
+```
+
+Open `http://localhost:9219` to view the CRX+LEAP URDF. The mock gateway
+publishes `/dual_crx/state` and `/right_leap/state`, and accepts the lease,
+heartbeat, teleoperation, stop, and release lifecycle. The ROS gateway clamps
+finite out-of-range joint targets to its configured limits; malformed or
+non-finite commands remain errors. Stop the retargeting process and the ROS
+launch with `Ctrl+C` when finished.
+
+The CRX profile currently has a URDF for kinematic visualization but no MuJoCo
+simulation model. Physical robot control remains a separate, unvalidated step.
 
 ## Citation
 
