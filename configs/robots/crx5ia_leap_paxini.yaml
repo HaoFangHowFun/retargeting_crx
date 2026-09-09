@@ -1,5 +1,5 @@
 # @package robot
-# Base is identity in world; right-arm home with Howard's J6 +180 degree adjustment.
+# Base is identity in world; J6 home is zero for the provisional 180-degree flange remount.
 # Provisional LEAP mounting; URDF/kinematic only, no MuJoCo model.
 name: crx5ia_leap_paxini
 model:
@@ -35,7 +35,7 @@ initial_qpos:
 - 3.141592653589793
 - 0
 - 1.5707963267948966
-- 3.141592653589793
+- 0
 - 0
 - 0.1
 - 0.1

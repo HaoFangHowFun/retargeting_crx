@@ -982,7 +982,7 @@
     <child link="thumb_tip_center_lower" />
   </joint>
   <joint name="flange_to_leap" type="fixed">
-    <origin rpy="0 -1.56 0" xyz="0.01 0.03 0.065" />
+    <origin rpy="-3.141592653589793 1.56 0" xyz="0.01 -0.03 -0.065" />
     <parent link="flange" />
     <child link="palm_lower" />
   </joint>
