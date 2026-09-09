@@ -124,7 +124,7 @@ def main() -> None:
     left_urdf.update_cfg(np.asarray(left_robot.initial_qpos, dtype=float))
     right_urdf.update_cfg(np.asarray(right_robot.initial_qpos, dtype=float))
     print(f"Bimanual Quest preview listening on http://localhost:{args.port}")
-    print("Left hand -> Co-act arm; right hand -> LEAP arm. No robot hardware is commanded. Ctrl+C to stop.")
+    print("Left hand -> LEAP arm; right hand -> LEAP arm. No robot hardware is commanded. Ctrl+C to stop.")
     source.open()
     last_report = time.monotonic()
     last_sequence: int | None = None

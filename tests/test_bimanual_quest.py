@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import numpy as np
+import yaml
 
+from retargeting.config import load_robot_config
 from teleoperation.bimanual import BimanualRetargetingPipeline
 from teleoperation.inputs.quest3 import HandFrame, HandSample, JOINT_NAMES, JointPose, Quest3BimanualOnlineInput
 
@@ -104,3 +106,14 @@ def test_bimanual_pipeline_keeps_left_and_right_commands_separate():
     np.testing.assert_allclose(result.left_qpos, [1.0])
     np.testing.assert_allclose(result.right_qpos, [2.0])
     np.testing.assert_allclose(result.qpos, [1.0, 2.0])
+
+
+def test_bimanual_leap_config_uses_left_dual_crx_home_and_22_dof_each():
+    with open("configs/bimanual/crx5ia_coact_leap.yaml", encoding="utf-8") as handle:
+        config = yaml.safe_load(handle)
+    left = load_robot_config(config["left"]["robot"])
+    right = load_robot_config(config["right"]["robot"])
+
+    assert len(left.actuated_joints) == len(right.actuated_joints) == 22
+    np.testing.assert_allclose(left.initial_qpos[:6], [0.0, 0.0, 0.0, 0.0, -np.pi / 2, 0.0])
+    np.testing.assert_allclose(right.initial_qpos[:6], [-np.pi / 2, 0.0, np.pi, 0.0, np.pi / 2, np.pi])

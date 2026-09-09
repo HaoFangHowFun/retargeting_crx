@@ -1,0 +1,127 @@
+# @package profile
+# 6 CRX joints followed by the existing 16 LEAP joints.
+# Arm posture penalties are unset pending CRX tuning; temporal weights are retained.
+name: vector_wrist_joint_crx5ia_leap_paxini_left
+robot: configs/robots/crx5ia_leap_paxini_left.yaml
+method: configs/retargeting_methods/vector_wrist_joint.yaml
+target:
+  wrist_link_name: wrist
+  link_pairs:
+  - - world
+    - thumb_tip_center
+  - - wrist
+    - thumb_tip_center
+  - - wrist
+    - finger1_tip_center
+  - - wrist
+    - finger2_tip_center
+  - - wrist
+    - finger3_tip_center
+  - - thumb_tip_center
+    - finger1_tip_center
+  - - thumb_tip_center
+    - finger2_tip_center
+  - - thumb_tip_center
+    - finger3_tip_center
+  - - thumb_tip_center_lower
+    - thumb_tip_center
+  - - finger1_tip_center_lower
+    - finger1_tip_center
+  - - finger2_tip_center_lower
+    - finger2_tip_center
+  - - finger3_tip_center_lower
+    - finger3_tip_center
+objective:
+  pinch_transition_threshold: 0.1
+  pinch_contact_threshold: 0.01
+  pinch_sigmoid_slope: 10.0
+  weights:
+    world_thumb: 10.0
+    wrist_fingertip: 1.0
+    thumb_primary: 10.0
+    fingertip_orientation: 10.0
+    wrist_rotation: 0.1
+    arm_link_vector: 10.0
+    arm_wrist_rotation: 1.0
+retargeting:
+  arm_dof: 6
+  human_wrist_index: 0
+  joint_position_weights:
+  - 0
+  - 0
+  - 0
+  - 0
+  - 0
+  - 0
+  - 0.5
+  - 0
+  - 0
+  - 0
+  - 0.5
+  - 0
+  - 0
+  - 0
+  - 0.5
+  - 0
+  - 0
+  - 0.5
+  - 0
+  - 0.1
+  - 0
+  - 0
+  joint_velocity_weights:
+  - 0.1
+  - 0.1
+  - 0.1
+  - 0.1
+  - 0.1
+  - 0.1
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+teleoperation:
+  max_joint_speed:
+  - 0.2
+  - 0.2
+  - 0.2
+  - 0.2
+  - 0.2
+  - 0.2
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+joint_limit_overrides:
+- indices:
+  - 8
+  - 9
+  - 12
+  - 13
+  - 16
+  - 17
+  lower: 0.0

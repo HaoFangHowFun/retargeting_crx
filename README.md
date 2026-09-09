@@ -119,6 +119,73 @@ For MuJoCo validation, install `.[mujoco-web,quest3]` and select
 `viewer.enabled=true`. Confirm the Quest-to-robot frame calibration in
 simulation before connecting robot hardware.
 
+## Dual CRX-5iA + LEAP Preview
+
+The bimanual setup uses a left LEAP hand and a right LEAP hand, each with
+6 CRX arm joints and 16 finger joints. The existing config filename
+`configs/bimanual/crx5ia_coact_leap.yaml` is retained, but now selects two LEAP
+arms. Each arm has its own initial pose. The left-hand mount compensates for
+its different palm origin using the right-hand mount as a reference; see the
+[left-hand asset notes](assets/robots/crx5ia_leap_paxini_left/README.md).
+
+**Mount orientation / merge note:** This branch's LEAP mounts have not yet
+received the 180-degree flip. The maintainer reports that the physical-test
+version on `main` already includes that flip. When merging, follow `main`'s
+mount orientation and re-evaluate the left-hand translation compensation and
+flange-to-wrist alignment against it. Do not overwrite the flipped mount with
+this branch's current transform or assume its offset remains valid unchanged.
+
+Run these commands from the repository root with the project environment
+activated. On Howard's WSL installation, activate the existing environment with:
+
+```bash
+source /home/howard/.venvs/retargeting_crx/bin/activate
+```
+
+Inspect the static initial pose at `http://localhost:9219`:
+
+```bash
+python scripts/view_bimanual_initial.py \
+  --config configs/bimanual/crx5ia_coact_leap.yaml
+```
+
+Preview a small closed EEF trajectory at `http://localhost:9220`:
+
+```bash
+python scripts/view_bimanual_trajectory.py \
+  --config configs/bimanual/crx5ia_coact_leap.yaml
+```
+
+The demo generates reachable flange poses from a small joint-space loop, then
+solves arm-only IK from the previous result while holding the fingers at home.
+It prints maximum position and orientation errors before opening the viewer.
+Yellow shows the target EEF and path; magenta shows the solved EEF. Playback
+starts when a browser connects. Uncheck **Play** to pause and use **Frame** to
+inspect individual samples. Defaults are a 12-second cycle, 241 samples, and
+`--amplitude 0.08` radians for the reference joint motion. Use `--duration`,
+`--samples`, `--amplitude`, or `--port` to adjust the preview.
+
+Validate the same trajectory without opening a viewer:
+
+```bash
+python scripts/view_bimanual_trajectory.py --headless
+```
+
+IK failures or residuals above 1 mm / 0.5 degrees stop the demo. This checks
+kinematic EEF tracking; it does not exercise hand retargeting, dynamics,
+collision checking, or physical robot control.
+
+For live Quest hand tracking, stop the static viewer first to free port 9219,
+connect the headset as described above, then run:
+
+```bash
+python scripts/run_bimanual_quest_preview.py \
+  --config configs/bimanual/crx5ia_coact_leap.yaml
+```
+
+Both hands must be tracked to initialize. All three previews use Viser and
+send no commands to robot hardware. Press `Ctrl+C` to stop.
+
 ## Citation
 
 ```bibtex
