@@ -2,11 +2,14 @@ import numpy as np
 import pytest
 
 from retargeting_ros.dual_crx_contract import (
+    BIMANUAL_CRX_NAMES,
     CRX_PROFILE_NAMES,
     DUAL_CRX_NAMES,
     to_dual_crx_command,
     to_dual_crx_names,
     to_dual_crx_positions,
+    to_bimanual_crx_command,
+    to_bimanual_crx_positions,
 )
 
 
@@ -34,7 +37,25 @@ def test_command_is_finite_and_detached():
     assert values == tuple(qpos.tolist())
 
 
+def test_bimanual_command_uses_left_then_right_order():
+    qpos = np.arange(44, dtype=float)
+    names, values = to_bimanual_crx_command(qpos)
+    assert names == BIMANUAL_CRX_NAMES
+    assert names[:6] == tuple(f"left_J{i}" for i in range(1, 7))
+    assert names[6:22] == tuple(f"left_leap_joint_{i}" for i in range(16))
+    assert names[22:28] == tuple(f"right_J{i}" for i in range(1, 7))
+    assert names[28:] == tuple(f"right_leap_joint_{i}" for i in range(16))
+    assert values == tuple(qpos.tolist())
+
+
+@pytest.mark.parametrize("qpos", [np.zeros(43), np.zeros(45), np.full(44, np.nan)])
+def test_rejects_invalid_bimanual_positions(qpos):
+    with pytest.raises(ValueError):
+        to_bimanual_crx_positions(qpos)
+
+
 def test_publisher_module_is_importable_without_ros():
-    from retargeting_ros.dual_crx_publisher import DualCrxPublisher
+    from retargeting_ros.dual_crx_publisher import BimanualDualCrxPublisher, DualCrxPublisher
 
     assert DualCrxPublisher.__name__ == "DualCrxPublisher"
+    assert BimanualDualCrxPublisher.__name__ == "BimanualDualCrxPublisher"

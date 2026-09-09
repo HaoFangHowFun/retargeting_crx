@@ -5,7 +5,11 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from retargeting_ros.dual_crx_contract import CRX_PROFILE_NAMES, to_dual_crx_command
+from retargeting_ros.dual_crx_contract import (
+    CRX_PROFILE_NAMES,
+    to_bimanual_crx_command,
+    to_dual_crx_command,
+)
 
 
 class DualCrxPublisher:
@@ -36,4 +40,17 @@ class DualCrxPublisher:
         return message
 
 
-__all__ = ["DualCrxPublisher"]
+class BimanualDualCrxPublisher(DualCrxPublisher):
+    """Publish one atomic 44-DOF left-then-right command."""
+
+    def publish(self, qpos: Sequence[float]) -> Any:
+        names, positions = to_bimanual_crx_command(qpos)
+        message = self._message_type(client_id=self.client_id)
+        message.target.header.stamp = self.node.get_clock().now().to_msg()
+        message.target.name = list(names)
+        message.target.position = list(positions)
+        self.publisher.publish(message)
+        return message
+
+
+__all__ = ["BimanualDualCrxPublisher", "DualCrxPublisher"]
