@@ -231,6 +231,8 @@ def build_execution_flow(config: Any) -> ExecutionFlow:
             detection_config,
             use_relative_wrist_alignment=mode_config.pipeline.use_relative_wrist_alignment,
         )
+    if detection_config.input_device == "quest3":
+        detection_config = detection_config.for_hand_side(str(input_data.get("hand_side", "right")))
     backend_config = _resolve_backend_config(config_data)
     command_config = load_teleoperation_command_config(profile_source, robot_config=robot_config)
     _, retargeter, output_filter, mapper, evaluator = _build_retargeting_components(

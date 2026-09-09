@@ -16,6 +16,8 @@ from teleoperation.inputs.quest3 import (
     Quest3OnlineInput,
     decode_quest3_sample,
 )
+from teleoperation.inputs.quest3.common import OPERATOR2MANO_LEFT_QUEST
+from teleoperation.inputs.quest3.common import OPERATOR2MANO_RIGHT_QUEST
 from teleoperation.observation_mapping import RelativeWristMapper
 
 
@@ -84,6 +86,10 @@ def test_decode_quest3_sample_maps_webxr_25_joints_to_mano_21() -> None:
     )
     assert not sample.keypoints_wrist.flags.writeable
     assert not sample.wrist_pose_sensor.flags.writeable
+
+
+def test_quest_left_basis_is_named_and_matches_selected_calibration() -> None:
+    np.testing.assert_array_equal(OPERATOR2MANO_LEFT_QUEST, OPERATOR2MANO_RIGHT_QUEST)
 
 
 def test_decode_quest3_sample_preserves_missing_hand_as_a_sample() -> None:

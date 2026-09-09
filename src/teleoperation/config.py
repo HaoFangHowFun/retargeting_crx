@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -236,6 +236,10 @@ class DetectionSourceConfig:
     rotation_euler_xyz_deg: tuple[float, float, float]
     translation: tuple[float, float, float]
     use_relative_wrist_alignment: bool = False
+    left_rotation_euler_xyz_deg: tuple[float, float, float] | None = None
+    left_translation: tuple[float, float, float] | None = None
+    right_rotation_euler_xyz_deg: tuple[float, float, float] | None = None
+    right_translation: tuple[float, float, float] | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "DetectionSourceConfig":
@@ -248,15 +252,53 @@ class DetectionSourceConfig:
             Typed detection source config.
         """
         transform_data = data.get("world_to_robot", data)
+        if not isinstance(transform_data, dict):
+            raise ValueError("world_to_robot must be a mapping.")
+
+        def _rotation(values: Any) -> tuple[float, float, float]:
+            return tuple(float(item) for item in values)
+
+        def _translation(values: Any) -> tuple[float, float, float]:
+            return tuple(float(item) for item in values)
+
+        default_rotation = _rotation(transform_data.get("rotation_euler_xyz_deg", [0.0, 0.0, 0.0]))
+        default_translation = _translation(transform_data.get("translation", [0.0, 0.0, 0.0]))
+        side_data = transform_data.get("by_hand", {})
+        if not isinstance(side_data, dict):
+            raise ValueError("world_to_robot.by_hand must be a mapping.")
+
+        def _side_values(side: str) -> tuple[tuple[float, float, float] | None, tuple[float, float, float] | None]:
+            raw = side_data.get(side)
+            if raw is None:
+                return None, None
+            if not isinstance(raw, dict):
+                raise ValueError(f"world_to_robot.by_hand.{side} must be a mapping.")
+            return (
+                _rotation(raw.get("rotation_euler_xyz_deg", default_rotation)),
+                _translation(raw.get("translation", default_translation)),
+            )
+
+        left_rotation, left_translation = _side_values("left")
+        right_rotation, right_translation = _side_values("right")
         return cls(
             name=str(data["name"]),
             input_device=str(data["input_device"]),
-            rotation_euler_xyz_deg=tuple(
-                float(item) for item in transform_data.get("rotation_euler_xyz_deg", [0.0, 0.0, 0.0])
-            ),
-            translation=tuple(float(item) for item in transform_data.get("translation", [0.0, 0.0, 0.0])),
+            rotation_euler_xyz_deg=default_rotation,
+            translation=default_translation,
             use_relative_wrist_alignment=bool(data.get("use_relative_wrist_alignment", False)),
+            left_rotation_euler_xyz_deg=left_rotation,
+            left_translation=left_translation,
+            right_rotation_euler_xyz_deg=right_rotation,
+            right_translation=right_translation,
         )
+
+    def for_hand_side(self, hand_side: str) -> "DetectionSourceConfig":
+        """Return this calibration with an optional per-hand override applied."""
+        if hand_side not in {"left", "right"}:
+            raise ValueError("hand_side must be 'left' or 'right'.")
+        rotation = getattr(self, f"{hand_side}_rotation_euler_xyz_deg") or self.rotation_euler_xyz_deg
+        translation = getattr(self, f"{hand_side}_translation") or self.translation
+        return replace(self, rotation_euler_xyz_deg=rotation, translation=translation)
 
     def validate(self) -> None:
         """Validate detector-source calibration metadata.
@@ -273,6 +315,13 @@ class DetectionSourceConfig:
             raise ValueError("rotation_euler_xyz_deg must have exactly 3 values.")
         if len(self.translation) != 3:
             raise ValueError("translation must have exactly 3 values.")
+        for side in ("left", "right"):
+            rotation = getattr(self, f"{side}_rotation_euler_xyz_deg")
+            translation = getattr(self, f"{side}_translation")
+            if rotation is not None and len(rotation) != 3:
+                raise ValueError(f"{side}_rotation_euler_xyz_deg must have exactly 3 values.")
+            if translation is not None and len(translation) != 3:
+                raise ValueError(f"{side}_translation must have exactly 3 values.")
 
 
 @dataclass(frozen=True)

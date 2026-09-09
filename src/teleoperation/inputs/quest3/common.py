@@ -15,6 +15,14 @@ from teleoperation.types import SensorHandSample
 # Keep Quest-specific calibration local rather than changing the shared AVP basis.
 OPERATOR2MANO_RIGHT_QUEST = np.array([[0, -1, 0], [-1, 0, 0], [0, 0, -1]])
 
+# Quest left-hand calibration: the shared left basis followed by local-Z +180
+# degrees, then local-X +90 degrees. Keep it independent from AVP/RGB.
+OPERATOR2MANO_LEFT_QUEST = np.array([
+    [0, -1, 0],
+    [-1, 0, 0],
+    [0, 0, -1],
+])
+
 
 # MediaPipe/MANO uses four joints for each non-thumb finger. WebXR additionally
 # reports a metacarpal joint, so those four entries are intentionally omitted.
@@ -103,7 +111,7 @@ def decode_quest3_sample(
     wrist = hand.joints["wrist"]
     wrist_rotation = Rotation.from_quat(wrist.rotation_xyzw).as_matrix()
     operator_to_mano = (
-        OPERATOR2MANO_RIGHT_QUEST if hand_side == "right" else OPERATOR2MANO_LEFT
+        OPERATOR2MANO_RIGHT_QUEST if hand_side == "right" else OPERATOR2MANO_LEFT_QUEST
     )
     wrist_rotation_mano = wrist_rotation @ operator_to_mano
     wrist_position = np.asarray(wrist.position_m, dtype=float)
@@ -129,4 +137,9 @@ def decode_quest3_sample(
     )
 
 
-__all__ = ["MANO_JOINT_NAMES", "decode_quest3_sample"]
+__all__ = [
+    "MANO_JOINT_NAMES",
+    "OPERATOR2MANO_LEFT_QUEST",
+    "OPERATOR2MANO_RIGHT_QUEST",
+    "decode_quest3_sample",
+]

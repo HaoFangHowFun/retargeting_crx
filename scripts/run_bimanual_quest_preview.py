@@ -80,8 +80,12 @@ def main() -> None:
 
     data = yaml.safe_load(resolve_project_path(args.config).read_text(encoding="utf-8"))
     detection_config = load_detection_source_config(data["input"]["config"])
-    left_robot, left_model, left_retargeter, left_mapper = _build_arm(data["left"], detection_config)
-    right_robot, right_model, right_retargeter, right_mapper = _build_arm(data["right"], detection_config)
+    left_robot, left_model, left_retargeter, left_mapper = _build_arm(
+        data["left"], detection_config.for_hand_side("left")
+    )
+    right_robot, right_model, right_retargeter, right_mapper = _build_arm(
+        data["right"], detection_config.for_hand_side("right")
+    )
     pipeline = BimanualRetargetingPipeline(
         left_mapper=left_mapper,
         right_mapper=right_mapper,
