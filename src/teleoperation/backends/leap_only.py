@@ -4,8 +4,8 @@ import threading
 import time
 from collections.abc import Sequence
 import numpy as np
-from retargeting_ros.dual_crx_contract import DUAL_CRX_NAMES
 from teleoperation.backends.base import BackendStepResult
+from teleoperation.backends.dual_crx_contract import DUAL_CRX_NAMES
 
 class LeapOnlyRobotBackend:
     """Own LEAP enable/command lifecycle without acquiring CRX control."""
