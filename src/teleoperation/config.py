@@ -637,7 +637,7 @@ class ExecutionBackendConfig:
         Returns:
             None.
         """
-        if self.name not in {"mujoco", "kinematic", "dual_crx"}:
+        if self.name not in {"mujoco", "kinematic", "dual_crx", "leap_only"}:
             raise ValueError(f"Unsupported backend name: {self.name!r}.")
         if self.command_hz <= 0:
             raise ValueError(f"command_hz must be positive, got {self.command_hz}.")

@@ -190,6 +190,13 @@ def _build_backend(
             initial_qpos=robot_config.initial_qpos,
             control_period=backend_config.control_period,
         )
+    if backend_config.name == "leap_only":
+        from teleoperation.backends.leap_only import LeapOnlyRobotBackend
+
+        return LeapOnlyRobotBackend(
+            initial_qpos=robot_config.initial_qpos,
+            control_period=backend_config.control_period,
+        )
     simulator_binding = load_mujoco_robot_binding_config(profile_robot_source, robot_config=robot_config)
     return MujocoRobotBackend(
         model_path=simulator_binding.simulation_file_path,
