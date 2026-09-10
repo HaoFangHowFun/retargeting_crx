@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from retargeting_ros.dual_crx_contract import (
+from teleoperation.backends.dual_crx_contract import (
     CRX_PROFILE_NAMES,
     to_bimanual_crx_command,
     to_dual_crx_command,

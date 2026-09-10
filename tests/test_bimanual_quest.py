@@ -116,4 +116,4 @@ def test_bimanual_leap_config_uses_left_dual_crx_home_and_22_dof_each():
 
     assert len(left.actuated_joints) == len(right.actuated_joints) == 22
     np.testing.assert_allclose(left.initial_qpos[:6], [0.0, 0.0, 0.0, 0.0, -np.pi / 2, np.pi])
-    np.testing.assert_allclose(right.initial_qpos[:6], [-np.pi / 2, 0.0, np.pi, 0.0, np.pi / 2, np.pi])
+    np.testing.assert_allclose(right.initial_qpos[:6], [-np.pi / 2, 0.0, np.pi, 0.0, np.pi / 2, 0.0])

@@ -188,6 +188,10 @@ The CRX+LEAP retargeting profile can be exercised with a Quest and the
 software-only `dual_crx_ros2` mock stack. This path does not connect to or move
 physical hardware.
 
+For the exact 2026-09-10 physical-computer checkpoint, known limitations, and
+right-only versus bimanual readiness, see the
+[physical dual-CRX handoff](docs/physical-dual-crx-handoff-2026-09-10.md).
+
 Start the mock ROS gateway in one terminal:
 
 ```bash

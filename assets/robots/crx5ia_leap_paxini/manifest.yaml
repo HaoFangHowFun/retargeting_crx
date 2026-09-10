@@ -28,4 +28,4 @@ source:
 hand_source:
   path: assets/robots/panda_leap_paxini/urdf/panda_leap_paxini.urdf
   sha256: 702a9717a27b760b1fb29fdfd2b37e985cfb75a95d7ec0ed8c89d82db94f3be0
-generated_urdf_sha256: a08e9b4dcd1e1cd324b04b83b4920640fe3ed39264093c216d57f8487fd2d440
+generated_urdf_sha256: 73b3224a7a1e5564ae22a14d88aa0ca71bef9251b548733d44fc9e6c126eb0fe

@@ -94,9 +94,10 @@ def generate(source: Path, destination: Path) -> None:
     mount = copy.deepcopy(hand.find("joint[@name='panda_leap']"))
     mount.set("name", "flange_to_leap")
     mount.find("parent").set("link", "flange")
-    # Howard's static-viewer adjustment; preserve the exact pitch, not -pi/2.
-    mount.find("origin").set("xyz", "0.01 0.03 0.065")
-    mount.find("origin").set("rpy", "0 -1.56 0")
+    # Physical-test remount: preserve the exact pitch, not pi/2, and the
+    # operator-selected 180-degree roll rather than regenerating the old mount.
+    mount.find("origin").set("xyz", "0.01 -0.03 -0.065")
+    mount.find("origin").set("rpy", "-3.141592653589793 1.56 0")
     robot.append(mount)
     urdf_path = destination / "urdf/crx5ia_leap_paxini.urdf"
     urdf_path.parent.mkdir(parents=True, exist_ok=True)

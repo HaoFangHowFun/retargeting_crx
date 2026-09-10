@@ -9,10 +9,10 @@ there is no CRX MJCF, dynamics, collision-aware planner, or hardware adapter.
 The default `world -> base_link` transform is identity. CRX geometry is not
 mirrored or modified for the right side. Initial arm joints follow
 `dual_crx_ros2/src/dual_crx_bringup/config/mock_initial_positions.yaml`
-and SRDF right-arm home at commit `dad54b1`:
-`[-90, 0, 180, 0, 90, 0]` degrees, with Howard's subsequent J6 +180-degree
-adjustment: the current initial pose is **`[-90, 0, 180, 0, 90, 180]` degrees**.
-J6 remains within its source limits of [-225, 225] degrees.
+and SRDF right-arm home at commit `dad54b1`. The current physical-test initial
+pose is **`[-90, 0, 180, 0, 90, 0]` degrees**. This replaces the earlier
+temporary J6 +180-degree adjustment; J6 remains within its source limits of
+[-225, 225] degrees.
 This is a model initialization, not a
 measurement or command to the physical robot. LEAP initial joints follow
 `panda_leap_paxini`.
@@ -28,10 +28,11 @@ world -> base_link -> J1_link ... J6_link -> flange -> palm_lower -> wrist
 - `J6_link -> flange`: translation `[0.145, 0, 0]` m.
 - `flange -> ee_mount`: identity.
 - `flange -> fanuc_flange`: zero translation, fixed-axis RPY `[180, -90, 0]` degrees.
-- **Howard-adjusted** `flange -> palm_lower`: XYZ `[0.01, 0.03, 0.065]` m,
-  RPY `[0, -1.56, 0]` radians, selected in the static viewer on 2026-09-07.
-  The exact pitch is retained (about -89.381 degrees, not exactly -90).
-  This supersedes the provisional Panda mounting; physical metrology is pending.
+- **Physical-test** `flange -> palm_lower`: XYZ `[0.01, -0.03, -0.065]` m,
+  RPY `[-pi, 1.56, 0]` radians. This is the 180-degree remount merged on
+  2026-09-09. The exact pitch is retained (about 89.381 degrees, not exactly
+  90). It supersedes the earlier static-viewer transform; physical metrology is
+  still pending.
 - `palm_lower -> wrist`: XYZ `[-0.16, -0.04, -0.01]` m,
   RPY `[0, pi/2, 0]`. This is the existing hand's optimization frame.
 
@@ -123,13 +124,17 @@ For comparison without overwriting tracked assets, pass `--output /tmp/crx-impor
 The importer rejects a mismatched commit or dirty FANUC checkout. Nothing in
 runtime configuration refers to that checkout or requires a ROS package lookup.
 
-## Verification checkpoint (2026-09-07)
+## Verification checkpoints
 
-Final user-tested setup: flange-to-palm XYZ `[0.01, 0.03, 0.065]` m,
-RPY `[0, -1.56, 0]` rad; initial J6 = 180 degrees; shared Quest
-`world_to_robot.rotation_euler_xyz_deg = [90, 0, 0]`. Howard reported that
-the live Quest + kinematic viewer test worked. This is user-reported visual
-evidence, not a new quantitative pose accuracy or physical-control measurement.
+The 2026-09-07 user-tested setup used flange-to-palm XYZ
+`[0.01, 0.03, 0.065]` m, RPY `[0, -1.56, 0]` rad, and initial J6 = 180
+degrees. Howard reported that the live Quest + kinematic viewer test worked.
+The current 2026-09-09 physical-test setup instead uses XYZ
+`[0.01, -0.03, -0.065]` m, RPY `[-pi, 1.56, 0]` rad, and initial J6 = 0.
+The earlier visual result does not validate this remount. Both checkpoints use
+the shared Quest `world_to_robot.rotation_euler_xyz_deg = [90, 0, 0]`. This is
+user-reported visual evidence, not a new quantitative pose accuracy or
+physical-control measurement.
 The shared Quest YAML now uses this CRX setup; Panda users should explicitly
 restore their previous `[90, 0, -90]` world calibration if appropriate.
 

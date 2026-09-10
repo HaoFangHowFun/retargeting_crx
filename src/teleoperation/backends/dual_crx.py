@@ -9,8 +9,8 @@ from typing import Any
 
 import numpy as np
 
-from retargeting_ros.dual_crx_contract import DUAL_CRX_NAMES, to_dual_crx_positions
 from teleoperation.backends.base import BackendStepResult
+from teleoperation.backends.dual_crx_contract import DUAL_CRX_NAMES, to_dual_crx_positions
 
 
 class DualCrxRobotBackend:
