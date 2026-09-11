@@ -176,9 +176,21 @@ def _attach_viser(config_data: dict[str, Any], flow: Any) -> ExecutionVisualizer
         actuated_joint_names=robot_config.actuated_joints,
         config=viewer_config,
     )
-    visualizer.update_qpos(flow.backend.get_joint_pos())
-    flow.add_command_observer(lambda result: visualizer.update_qpos(result.actual_qpos))
-    flow.add_reset_observer(lambda qpos: visualizer.update_qpos(qpos))
+    initial_qpos = flow.backend.get_joint_pos()
+    visualizer.update_qpos(initial_qpos)
+    visualizer.update_command_qpos(initial_qpos)
+    flow.add_command_observer(
+        lambda result: (
+            visualizer.update_qpos(result.actual_qpos),
+            visualizer.update_command_qpos(result.command_qpos),
+        )
+    )
+    flow.add_reset_observer(
+        lambda qpos: (
+            visualizer.update_qpos(qpos),
+            visualizer.update_command_qpos(qpos),
+        )
+    )
     _attach_observation_observers(flow, visualizer)
     return visualizer
 

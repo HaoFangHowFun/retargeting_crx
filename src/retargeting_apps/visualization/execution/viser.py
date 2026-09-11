@@ -79,6 +79,17 @@ class ViserLiveVisualizer:
                 load_meshes=True,
                 load_collision_meshes=False,
             )
+            # Keep the command target visible as a pale ghost beside the
+            # measured robot.  This makes a large solver/output jump obvious
+            # without hiding the state the backend actually reports.
+            self.command_urdf = urdf_class(
+                self.server,
+                Path(robot_file_path),
+                root_node_name="/command_preview",
+                mesh_color_override=(0.65, 0.82, 1.0, 0.35),
+                load_meshes=True,
+                load_collision_meshes=False,
+            )
             self._urdf_joint_names = tuple(str(name) for name in self.robot_urdf.get_actuated_joint_names())
             self._qpos_indices = self._resolve_urdf_qpos_indices()
             self._hand_renderer = ViserHandObservationRenderer(
@@ -135,6 +146,18 @@ class ViserLiveVisualizer:
         if values.shape != expected_shape or not np.isfinite(values).all():
             raise ValueError(f"qpos must be finite and have shape {expected_shape}.")
         self.robot_urdf.update_cfg(values[self._qpos_indices])
+
+    def update_command_qpos(self, qpos: Sequence[float]) -> None:
+        """Publish the qpos that is about to be sent to the backend.
+
+        The command is rendered as a translucent pale-blue URDF so it can be
+        compared directly with the solid measured robot mesh.
+        """
+        values = np.asarray(qpos, dtype=float)
+        expected_shape = (len(self.actuated_joint_names),)
+        if values.shape != expected_shape or not np.isfinite(values).all():
+            raise ValueError(f"qpos must be finite and have shape {expected_shape}.")
+        self.command_urdf.update_cfg(values[self._qpos_indices])
 
     def update_observation(self, observation: RetargetingHandObservation) -> None:
         """Publish one canonical human-hand observation beside the robot URDF.
