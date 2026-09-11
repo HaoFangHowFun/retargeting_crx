@@ -163,8 +163,17 @@ def main() -> None:
         _update_command_wrist_marker(left_urdf, left_command_wrist_marker, left_robot.initial_qpos, left_placement)
         _update_command_wrist_marker(right_urdf, right_command_wrist_marker, right_robot.initial_qpos, right_placement)
         def observer(result):
-            left_urdf.update_cfg(result.left_qpos)
-            right_urdf.update_cfg(result.right_qpos)
+            # With the ROS backend, render measured feedback for the solid
+            # robot meshes.  Preview mode has no backend, so the solved qpos
+            # remains the best available state estimate.
+            actual_qpos = result.qpos
+            backend = flow.backend
+            if backend is not None:
+                feedback_qpos = np.asarray(backend.get_joint_pos(), dtype=float)
+                if feedback_qpos.shape == (44,) and np.isfinite(feedback_qpos).all():
+                    actual_qpos = feedback_qpos
+            left_urdf.update_cfg(actual_qpos[:22])
+            right_urdf.update_cfg(actual_qpos[22:])
             _update_command_wrist_marker(left_urdf, left_command_wrist_marker, result.left_qpos, left_placement)
             _update_command_wrist_marker(right_urdf, right_command_wrist_marker, result.right_qpos, right_placement)
             left_hand_renderer.update_observation(_to_scene_observation(result.left_observation, left_placement))
