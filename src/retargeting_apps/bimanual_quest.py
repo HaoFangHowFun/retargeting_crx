@@ -70,6 +70,13 @@ def _to_scene_observation(observation: RetargetingHandObservation, placement: np
     )
 
 
+def _update_command_wrist_marker(urdf, marker, qpos: np.ndarray, placement: np.ndarray) -> None:
+    """Update a red marker at the command wrist pose computed by URDF FK."""
+    urdf.update_cfg(np.asarray(qpos, dtype=float))
+    wrist_pose = placement @ urdf._urdf.get_transform("wrist", "world")
+    marker.position = tuple(float(value) for value in wrist_pose[:3, 3])
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default="configs/bimanual/crx5ia_coact_leap.yaml")
@@ -137,6 +144,14 @@ def main() -> None:
         right_hand_renderer = ViserHandObservationRenderer(server, point_size=0.012, root_node_name="/quest_hand/right")
         left_placement = _placement_pose(data["left"])
         right_placement = _placement_pose(data["right"])
+        left_command_wrist_marker = server.scene.add_icosphere(
+            "/command_wrist_endpoint/left", radius=0.025, color=(235, 45, 45),
+            subdivisions=3, opacity=1.0,
+        )
+        right_command_wrist_marker = server.scene.add_icosphere(
+            "/command_wrist_endpoint/right", radius=0.025, color=(235, 45, 45),
+            subdivisions=3, opacity=1.0,
+        )
         for urdf, arm in ((left_urdf, data["left"]), (right_urdf, data["right"])):
             root = getattr(urdf, "_visual_root_frame", None)
             if root is not None:
@@ -145,9 +160,13 @@ def main() -> None:
         # Always show the configured dual_crx home pose before Quest tracking starts.
         left_urdf.update_cfg(np.asarray(left_robot.initial_qpos, dtype=float))
         right_urdf.update_cfg(np.asarray(right_robot.initial_qpos, dtype=float))
+        _update_command_wrist_marker(left_urdf, left_command_wrist_marker, left_robot.initial_qpos, left_placement)
+        _update_command_wrist_marker(right_urdf, right_command_wrist_marker, right_robot.initial_qpos, right_placement)
         def observer(result):
             left_urdf.update_cfg(result.left_qpos)
             right_urdf.update_cfg(result.right_qpos)
+            _update_command_wrist_marker(left_urdf, left_command_wrist_marker, result.left_qpos, left_placement)
+            _update_command_wrist_marker(right_urdf, right_command_wrist_marker, result.right_qpos, right_placement)
             left_hand_renderer.update_observation(_to_scene_observation(result.left_observation, left_placement))
             right_hand_renderer.update_observation(_to_scene_observation(result.right_observation, right_placement))
         print(f"Bimanual target preview: http://localhost:{args.port}", flush=True)
