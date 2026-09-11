@@ -28,13 +28,11 @@ world -> base_link -> J1_link ... J6_link -> flange -> palm_lower -> wrist
 - `J6_link -> flange`: translation `[0.145, 0, 0]` m.
 - `flange -> ee_mount`: identity.
 - `flange -> fanuc_flange`: zero translation, fixed-axis RPY `[180, -90, 0]` degrees.
-- **Physical-test** `flange -> palm_lower`: XYZ
-  `[0.037336626243399, -0.047897767636037, -0.065]` m,
-  RPY `[-pi, 1.56, 0]` radians. Relative to the left mount, the 180-degree
-  flange-local X roll maps `(x, y, z)` to `(x, -y, -z)`; only that mapping's
-  X/Y components are used here, while right-side Z remains unchanged. The exact
-  pitch is retained (about 89.381 degrees, not exactly 90). Physical metrology
-  is still pending.
+- **Physical-test** `flange -> palm_lower`: XYZ `[0.01, -0.03, -0.065]` m,
+  RPY `[-pi, 1.56, 0]` radians. This is the 180-degree remount merged on
+  2026-09-09. The exact pitch is retained (about 89.381 degrees, not exactly
+  90). It supersedes the earlier static-viewer transform; physical metrology is
+  still pending.
 - `palm_lower -> wrist`: XYZ `[-0.16, -0.04, -0.01]` m,
   RPY `[0, pi/2, 0]`. This is the existing hand's optimization frame.
 
@@ -131,11 +129,8 @@ runtime configuration refers to that checkout or requires a ROS package lookup.
 The 2026-09-07 user-tested setup used flange-to-palm XYZ
 `[0.01, 0.03, 0.065]` m, RPY `[0, -1.56, 0]` rad, and initial J6 = 180
 degrees. Howard reported that the live Quest + kinematic viewer test worked.
-The current physical-test setup instead uses XYZ
-`[0.037336626243399, -0.047897767636037, -0.065]` m,
-RPY `[-pi, 1.56, 0]` rad, and initial J6 = 0. Its X/Y values apply the relative
-180-degree X-roll mapping from the left mount while right-side Z remains
-unchanged.
+The current 2026-09-09 physical-test setup instead uses XYZ
+`[0.01, -0.03, -0.065]` m, RPY `[-pi, 1.56, 0]` rad, and initial J6 = 0.
 The earlier visual result does not validate this remount. Both checkpoints use
 the shared Quest `world_to_robot.rotation_euler_xyz_deg = [90, 0, 0]`. This is
 user-reported visual evidence, not a new quantitative pose accuracy or

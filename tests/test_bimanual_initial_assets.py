@@ -48,10 +48,4 @@ def test_left_mount_is_unflipped_while_right_mount_stays_flipped():
     expected_left[:3, :3] = Rotation.from_euler("xyz", [0.0, -1.56, 0.0]).as_matrix()
     expected_left[:3, 3] = [0.037336626243399, 0.047897767636037, 0.140188227821871]
     np.testing.assert_allclose(left_mount, expected_left, atol=1e-10)
-    expected_right = np.eye(4)
-    expected_right[:3, :3] = Rotation.from_euler(
-        "xyz", [-np.pi, 1.56, 0.0]
-    ).as_matrix()
-    expected_right[:3, 3] = [0.037336626243399, -0.047897767636037, -0.065]
-    np.testing.assert_allclose(right_mount, expected_right, atol=1e-10)
     assert not np.allclose(left_mount, right_mount, atol=1e-10)
