@@ -72,7 +72,9 @@ def _to_scene_observation(observation: RetargetingHandObservation, placement: np
 
 def _update_command_wrist_marker(urdf, marker, qpos: np.ndarray, placement: np.ndarray) -> None:
     """Update a red marker at the command wrist pose computed by URDF FK."""
-    urdf.update_cfg(np.asarray(qpos, dtype=float))
+    # Update only yourdfpy's FK state.  Calling ViserUrdf.update_cfg() here
+    # would overwrite the visible actual-feedback robot with the command pose.
+    urdf._urdf.update_cfg(np.asarray(qpos, dtype=float))
     wrist_pose = placement @ urdf._urdf.get_transform("wrist", "world")
     marker.position = tuple(float(value) for value in wrist_pose[:3, 3])
 
