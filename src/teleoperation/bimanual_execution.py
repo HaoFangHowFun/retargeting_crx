@@ -10,7 +10,8 @@ from teleoperation.output import QposOutputFilter
 class BimanualExecutionFlow:
     def __init__(self, *, source, pipeline, initial_qpos, backend_factory=None,
                  observer=None, command_hz=20., timeout=.25, duration=0.,
-                 arm_output_filters: tuple[QposOutputFilter, QposOutputFilter] | None = None):
+                 arm_output_filters: tuple[QposOutputFilter, QposOutputFilter] | None = None,
+                 hand_output_filters: tuple[QposOutputFilter, QposOutputFilter] | None = None):
         if not np.isfinite(command_hz) or command_hz <= 0:
             raise ValueError("command_hz must be positive")
         if not np.isfinite(duration) or duration < 0:
@@ -27,7 +28,13 @@ class BimanualExecutionFlow:
                 raise ValueError("arm_output_filters must contain left and right filters")
             if any(output_filter.previous_qpos.shape != (6,) for output_filter in arm_output_filters):
                 raise ValueError("each arm output filter must contain six CRX joints")
+        if hand_output_filters is not None:
+            if len(hand_output_filters) != 2:
+                raise ValueError("hand_output_filters must contain left and right filters")
+            if any(output_filter.previous_qpos.shape != (16,) for output_filter in hand_output_filters):
+                raise ValueError("each hand output filter must contain sixteen LEAP joints")
         self.arm_output_filters = arm_output_filters
+        self.hand_output_filters = hand_output_filters
         self.backend_factory, self.observer = backend_factory, observer
         self.period, self.timeout = 1. / command_hz, timeout
         self.backend = None
@@ -39,25 +46,33 @@ class BimanualExecutionFlow:
         self._recovery_sequence = None
         self._last_qpos = self.initial_qpos.copy()
 
-    def _reset_arm_output_filters(self, seed: np.ndarray) -> None:
-        """Seed arm-only smoothing from the current measured robot pose."""
-        if self.arm_output_filters is None:
-            return
-        left_filter, right_filter = self.arm_output_filters
-        left_filter.reset(seed[:6])
-        right_filter.reset(seed[22:28])
+    def _reset_output_filters(self, seed: np.ndarray) -> None:
+        """Seed arm and hand smoothing from the current measured robot pose."""
+        if self.arm_output_filters is not None:
+            left_filter, right_filter = self.arm_output_filters
+            left_filter.reset(seed[:6])
+            right_filter.reset(seed[22:28])
+        if self.hand_output_filters is not None:
+            left_filter, right_filter = self.hand_output_filters
+            left_filter.reset(seed[6:22])
+            right_filter.reset(seed[28:])
 
-    def _filter_arm_commands(self, result: BimanualRetargetedFrame) -> BimanualRetargetedFrame:
-        """Smooth only CRX J1-J6 while leaving both sixteen-joint hand targets raw."""
-        if self.arm_output_filters is None:
+    def _filter_commands(self, result: BimanualRetargetedFrame) -> BimanualRetargetedFrame:
+        """Apply the independently configured CRX and LEAP output filters."""
+        if self.arm_output_filters is None and self.hand_output_filters is None:
             return result
         left_qpos = np.asarray(result.left_qpos, dtype=float).copy()
         right_qpos = np.asarray(result.right_qpos, dtype=float).copy()
         if left_qpos.shape != (22,) or right_qpos.shape != (22,):
             raise ValueError("bimanual filtering requires 22 positions per robot")
-        left_filter, right_filter = self.arm_output_filters
-        left_qpos[:6] = left_filter.apply(left_qpos[:6])
-        right_qpos[:6] = right_filter.apply(right_qpos[:6])
+        if self.arm_output_filters is not None:
+            left_filter, right_filter = self.arm_output_filters
+            left_qpos[:6] = left_filter.apply(left_qpos[:6])
+            right_qpos[:6] = right_filter.apply(right_qpos[:6])
+        if self.hand_output_filters is not None:
+            left_filter, right_filter = self.hand_output_filters
+            left_qpos[6:] = left_filter.apply(left_qpos[6:])
+            right_qpos[6:] = right_filter.apply(right_qpos[6:])
         # Match the ordinary execution flow: the temporal objective follows the
         # filtered command actually visible to the robot, not the raw IK result.
         self.pipeline.left_retargeter.previous_qpos = left_qpos.copy()
@@ -109,7 +124,7 @@ class BimanualExecutionFlow:
             seed = self._last_qpos if self.backend is None else self.backend.get_joint_pos()
             self.pipeline.left_retargeter.reset(seed[:22])
             self.pipeline.right_retargeter.reset(seed[22:])
-            self._reset_arm_output_filters(seed)
+            self._reset_output_filters(seed)
             if not self.pipeline.initialize(sample, seed[:22], seed[22:]):
                 return None
             first_start = self.started_at is None
@@ -130,7 +145,7 @@ class BimanualExecutionFlow:
         age = time.monotonic() - started if received_ns is None else (time.monotonic_ns() - received_ns) / 1e9
         if age > self.source.max_age_s:
             return None
-        result = self._filter_arm_commands(result)
+        result = self._filter_commands(result)
         if self.backend is not None:
             try:
                 self.backend.execute(result.qpos)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -128,12 +129,32 @@ def main() -> None:
 
     backend_factory = None
     arm_output_filters = None
+    hand_output_filters = None
     if args.backend == "dual_crx":
         from teleoperation.backends.bimanual_crx import BimanualCrxRobotBackend
         mode_config = load_teleoperation_mode_config(resolve_project_path(args.teleoperation_mode))
+        output_config = data.get("output", {})
+        arm_mode_config = replace(
+            mode_config,
+            output=replace(
+                mode_config.output,
+                smoothing_alpha=float(output_config.get("arm_smoothing_alpha", mode_config.output.smoothing_alpha)),
+            ),
+        )
+        hand_mode_config = replace(
+            mode_config,
+            output=replace(
+                mode_config.output,
+                smoothing_alpha=float(output_config.get("hand_smoothing_alpha", mode_config.output.smoothing_alpha)),
+            ),
+        )
         arm_output_filters = (
-            QposOutputFilter(left_robot.initial_qpos[:6], mode_config),
-            QposOutputFilter(right_robot.initial_qpos[:6], mode_config),
+            QposOutputFilter(left_robot.initial_qpos[:6], arm_mode_config),
+            QposOutputFilter(right_robot.initial_qpos[:6], arm_mode_config),
+        )
+        hand_output_filters = (
+            QposOutputFilter(left_robot.initial_qpos[6:], hand_mode_config),
+            QposOutputFilter(right_robot.initial_qpos[6:], hand_mode_config),
         )
         backend_factory = lambda: BimanualCrxRobotBackend(
             initial_qpos=np.concatenate((left_robot.initial_qpos, right_robot.initial_qpos)),
@@ -202,7 +223,7 @@ def main() -> None:
         source=source, pipeline=pipeline,
         initial_qpos=np.concatenate((left_robot.initial_qpos, right_robot.initial_qpos)),
         backend_factory=backend_factory, observer=observer, command_hz=args.command_hz, duration=args.duration,
-        arm_output_filters=arm_output_filters)
+        arm_output_filters=arm_output_filters, hand_output_filters=hand_output_filters)
     try:
         flow.run()
     except KeyboardInterrupt:

@@ -1,4 +1,5 @@
 """Hardware-free flow and feedback routing regression tests."""
+from dataclasses import replace
 import threading
 import time
 from types import SimpleNamespace as NS
@@ -87,7 +88,7 @@ def test_flow_uses_measured_seed_and_never_republishes_missing_or_repeated_frame
         flow.step(sample(4, right_index=5))
 
 
-def test_flow_smooths_only_crx_arms_and_seeds_filters_from_measured_feedback():
+def test_flow_smooths_crx_and_leap_independently_and_seeds_from_measured_feedback():
     measured = np.full(44, .12)
     left_raw = np.concatenate((np.ones(6), np.arange(16, dtype=float) + 10.))
     right_raw = np.concatenate((-np.ones(6), np.arange(16, dtype=float) + 30.))
@@ -106,14 +107,20 @@ def test_flow_smooths_only_crx_arms_and_seeds_filters_from_measured_feedback():
         execute=lambda q: commands.append(q.copy()),
     )
     mode = load_teleoperation_mode_config("configs/teleoperation_modes/real_world.yaml")
+    arm_mode = replace(mode, output=replace(mode.output, smoothing_alpha=.2))
+    hand_mode = replace(mode, output=replace(mode.output, smoothing_alpha=.3))
     flow = BimanualExecutionFlow(
         source=NS(max_age_s=.15),
         pipeline=pipeline,
         initial_qpos=np.zeros(44),
         backend_factory=lambda: backend,
         arm_output_filters=(
-            QposOutputFilter(np.zeros(6), mode),
-            QposOutputFilter(np.zeros(6), mode),
+            QposOutputFilter(np.zeros(6), arm_mode),
+            QposOutputFilter(np.zeros(6), arm_mode),
+        ),
+        hand_output_filters=(
+            QposOutputFilter(np.zeros(16), hand_mode),
+            QposOutputFilter(np.zeros(16), hand_mode),
         ),
     )
 
@@ -121,12 +128,14 @@ def test_flow_smooths_only_crx_arms_and_seeds_filters_from_measured_feedback():
     result = flow.step(sample(2))
 
     assert result is not None
-    expected_left_arm = .3 * left_raw[:6] + .7 * measured[:6]
-    expected_right_arm = .3 * right_raw[:6] + .7 * measured[22:28]
+    expected_left_arm = .2 * left_raw[:6] + .8 * measured[:6]
+    expected_right_arm = .2 * right_raw[:6] + .8 * measured[22:28]
+    expected_left_hand = .3 * left_raw[6:] + .7 * measured[6:22]
+    expected_right_hand = .3 * right_raw[6:] + .7 * measured[28:]
     np.testing.assert_allclose(commands[0][:6], expected_left_arm)
     np.testing.assert_allclose(commands[0][22:28], expected_right_arm)
-    np.testing.assert_array_equal(commands[0][6:22], left_raw[6:])
-    np.testing.assert_array_equal(commands[0][28:], right_raw[6:])
+    np.testing.assert_allclose(commands[0][6:22], expected_left_hand)
+    np.testing.assert_allclose(commands[0][28:], expected_right_hand)
     np.testing.assert_allclose(pipeline.left_retargeter.previous_qpos, commands[0][:22])
     np.testing.assert_allclose(pipeline.right_retargeter.previous_qpos, commands[0][22:])
 

@@ -17,3 +17,6 @@ input:
   config: configs/inputs/quest3.yaml
   port: 8765
   max_age_s: 0.15
+output:
+  arm_smoothing_alpha: 0.2
+  hand_smoothing_alpha: 0.3
