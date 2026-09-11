@@ -119,7 +119,13 @@ class RetargetOptimizer:
             ref_values["fixed_qpos"] = fixed_qpos
             ref_values["fixed_qpos_indices"] = fixed_qpos_indices
         self.opt.set_min_objective(self.get_objective_function(ref_values))
-        x_init = ref_values["qpos_doa_last"]
+        measured_seed = np.asarray(ref_values["qpos_doa_last"], dtype=float)
+        if measured_seed.shape != (self.opt_dim,) or not np.isfinite(measured_seed).all():
+            raise ValueError(f"Optimizer seed must contain {self.opt_dim} finite positions")
+        # Physical feedback can fall outside profile-specific objective bounds.
+        # Project only the numerical initial guess; preserve the measured temporal
+        # reference and all hardware/model limits.
+        x_init = np.clip(measured_seed, self.joint_limits[:, 0], self.joint_limits[:, 1])
         try:
             qpos_doa = self.opt.optimize(x_init)
         except ValueError as exc:

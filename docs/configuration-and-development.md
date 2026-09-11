@@ -162,6 +162,9 @@ Optional live-input dependencies:
 
 ### dual_crx_ros2 integration
 
+For dual-arm Quest execution with an optional left LEAP, see
+[bimanual physical execution](bimanual_physical.md). The right-only commands below remain supported.
+
 The CRX+LEAP profile can publish directly to the dual-crx ROS 2 gateway when
 the retargeting process runs in a Python 3.12 environment that can import both
 ROS Jazzy and the retargeting dependencies. Select the opt-in backend with:

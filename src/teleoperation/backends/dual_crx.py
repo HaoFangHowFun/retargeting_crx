@@ -16,10 +16,15 @@ from teleoperation.backends.dual_crx_contract import DUAL_CRX_NAMES, to_dual_crx
 class DualCrxRobotBackend:
     """Publish CRX+LEAP targets through the dual-crx control gateway."""
 
+    NAMES = DUAL_CRX_NAMES
+    SCOPE = 2
+    TOPIC = "/dual_crx/teleop"
+    positions = staticmethod(to_dual_crx_positions)
+
     def __init__(self, *, initial_qpos: Sequence[float], control_period: float, client_id: str = "retargeting_crx"):
         values = np.asarray(initial_qpos, dtype=float)
-        if values.shape != (22,) or not np.isfinite(values).all():
-            raise ValueError("dual_crx initial_qpos must be a finite vector of shape (22,).")
+        if values.shape != (len(self.NAMES),) or not np.isfinite(values).all():
+            raise ValueError(f"dual_crx initial_qpos must be finite with {len(self.NAMES)} positions.")
         if control_period <= 0:
             raise ValueError("control_period must be positive.")
         try:
@@ -38,7 +43,6 @@ class DualCrxRobotBackend:
         self._executor = SingleThreadedExecutor()
         self._executor.add_node(self._node)
         self._thread = threading.Thread(target=self._executor.spin, daemon=True)
-        self._thread.start()
         self._state_lock = threading.Lock()
         self._state = None
         self._hand_state = None
@@ -47,25 +51,25 @@ class DualCrxRobotBackend:
         self._actual = values.copy()
         self._period = float(control_period)
         self._client_id = client_id
-        self._scope = 2
+        self._scope = self.SCOPE
         self._lease_duration = 5.0
-        self._publisher = self._node.create_publisher(TeleopCommand, "/dual_crx/teleop/command", 1)
+        self._publisher = self._node.create_publisher(TeleopCommand, self.TOPIC + "/command", 1)
         self._node.create_subscription(SystemState, "/dual_crx/state", self._state_cb, 10)
-        self._node.create_subscription(LeapState, "/right_leap/state", self._hand_state_cb, 10)
         self._clients = {
             "acquire": self._node.create_client(AcquireControl, "/dual_crx/acquire_control"),
             "heartbeat": self._node.create_client(Heartbeat, "/dual_crx/heartbeat"),
             "release": self._node.create_client(ReleaseControl, "/dual_crx/release_control"),
-            "teleop": self._node.create_client(SetTeleop, "/dual_crx/teleop/enable"),
+            "teleop": self._node.create_client(SetTeleop, self.TOPIC + "/enable"),
             "stop": self._node.create_client(SoftwareStop, "/dual_crx/stop"),
-            "hand": self._node.create_client(SetBool, "/right_leap/enable"),
         }
+        self._create_hand_channels()
         self._heartbeat = self._node.create_timer(1.0, self._renew_lease)
         self._started = False
         self._acquired = False
         self._hand_requested = False
         self._has_executed = False
         self._startup_timer = None
+        self._thread.start()
         try:
             self._start()
         except BaseException:
@@ -128,13 +132,7 @@ class DualCrxRobotBackend:
             raise RuntimeError("timed out waiting for dual-crx state")
         self._call("acquire", self._request("acquire"))
         self._acquired = True
-        self._hand_requested = True
-        self._call("hand", self._request("hand"))
-        deadline = time.monotonic() + 5.0
-        while (self._hand_state is None or not self._hand_state.enabled) and time.monotonic() < deadline:
-            time.sleep(.01)
-        if self._hand_state is None or not self._hand_state.enabled:
-            raise RuntimeError("timed out waiting for enabled hand feedback")
+        self._enable_hands()
         self._seed_from_feedback()
         deadline = time.monotonic() + 10.0
         while True:
@@ -150,14 +148,33 @@ class DualCrxRobotBackend:
         self._started = True
         self._startup_timer = self._node.create_timer(self._period, self._publish_startup_target)
 
+    def _create_hand_channels(self):
+        from dual_crx_interfaces.msg import LeapState
+        from std_srvs.srv import SetBool
+        self._node.create_subscription(LeapState, "/right_leap/state", self._hand_state_cb, 10)
+        self._clients["hand"] = self._node.create_client(SetBool, "/right_leap/enable")
+
+    def _enable_hands(self):
+        self._hand_requested = True
+        self._call("hand", self._request("hand"))
+        deadline = time.monotonic() + 5.0
+        while (self._hand_state is None or not self._hand_state.enabled) and time.monotonic() < deadline:
+            time.sleep(.01)
+        if self._hand_state is None or not self._hand_state.enabled:
+            raise RuntimeError("timed out waiting for enabled hand feedback")
+
+    def _hand_cleanup_actions(self):
+        from std_srvs.srv import SetBool
+        return [("hand", SetBool.Request(data=False))] if self._hand_requested else []
+
     def _publish_startup_target(self) -> None:
         if not self._started or self._has_executed:
             return
         from dual_crx_interfaces.msg import TeleopCommand
         message = TeleopCommand(client_id=self._client_id)
         message.target.header.stamp = self._node.get_clock().now().to_msg()
-        message.target.name = list(DUAL_CRX_NAMES)
-        message.target.position = list(to_dual_crx_positions(self._target))
+        message.target.name = list(self.NAMES)
+        message.target.position = list(self.positions(self._target))
         self._publisher.publish(message)
 
     def _request(self, key: str) -> Any:
@@ -214,12 +231,12 @@ class DualCrxRobotBackend:
 
     def execute(self, qpos: np.ndarray) -> BackendStepResult:
         values = np.asarray(qpos, dtype=float)
-        positions = to_dual_crx_positions(values)
+        positions = self.positions(values)
         self._has_executed = True
         from dual_crx_interfaces.msg import TeleopCommand
         message = TeleopCommand(client_id=self._client_id)
         message.target.header.stamp = self._node.get_clock().now().to_msg()
-        message.target.name = list(DUAL_CRX_NAMES)
+        message.target.name = list(self.NAMES)
         message.target.position = list(positions)
         self._publisher.publish(message)
         self._target = values.copy()
@@ -235,8 +252,7 @@ class DualCrxRobotBackend:
         actions = []
         if self._acquired:
             actions.append(("stop", SoftwareStop.Request(reason="retargeting shutdown")))
-        if self._hand_requested:
-            actions.append(("hand", SetBool.Request(data=False)))
+        actions.extend(self._hand_cleanup_actions())
         if self._acquired:
             actions.append(("release", ReleaseControl.Request(client_id=self._client_id, arm_scope=self._scope)))
         for key, request in actions:
