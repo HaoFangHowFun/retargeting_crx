@@ -1,5 +1,6 @@
 # @package robot
-# Base is identity in world; left-arm home uses the 180-degree flange remount.
+# Base is identity in world; the left hand uses the unflipped flange mount,
+# while the left-arm J6 home remains at zero.
 # Provisional LEAP mounting; URDF/kinematic only, no MuJoCo model.
 name: crx5ia_leap_paxini_left
 model:
@@ -35,7 +36,7 @@ initial_qpos:
 - 0
 - 0
 - -1.5707963267948966
-- 3.141592653589793
+- 0
 - 0
 - 0.1
 - 0.1

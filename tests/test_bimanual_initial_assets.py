@@ -28,7 +28,7 @@ def test_bimanual_initial_mesh_references_exist(side):
             )
 
 
-def test_left_mount_aligns_middle_finger_and_preserves_reference_wrist():
+def test_left_mount_is_unflipped_while_right_mount_stays_flipped():
     root = Path(__file__).resolve().parents[1] / "assets/robots"
 
     def joint_transform(urdf, name):
@@ -40,13 +40,12 @@ def test_left_mount_aligns_middle_finger_and_preserves_reference_wrist():
         pose[:3, 3] = np.fromstring(origin.attrib["xyz"], sep=" ")
         return pose
 
-    frames = []
-    for name in ("crx5ia_leap_paxini_left", "crx5ia_leap_paxini"):
-        urdf = ET.parse(root / name / "urdf" / f"{name}.urdf")
-        mount = joint_transform(urdf, "flange_to_leap")
-        frames.append((
-            mount @ joint_transform(urdf, "joint_5"),
-            mount @ joint_transform(urdf, "palm_to_wrist"),
-        ))
-    np.testing.assert_allclose(frames[0][0], frames[1][0], atol=1e-10)
-    np.testing.assert_allclose(frames[0][1], frames[1][1], atol=1e-10)
+    left_urdf = ET.parse(root / "crx5ia_leap_paxini_left" / "urdf" / "crx5ia_leap_paxini_left.urdf")
+    right_urdf = ET.parse(root / "crx5ia_leap_paxini" / "urdf" / "crx5ia_leap_paxini.urdf")
+    left_mount = joint_transform(left_urdf, "flange_to_leap")
+    right_mount = joint_transform(right_urdf, "flange_to_leap")
+    expected_left = np.eye(4)
+    expected_left[:3, :3] = Rotation.from_euler("xyz", [0.0, -1.56, 0.0]).as_matrix()
+    expected_left[:3, 3] = [0.037336626243399, 0.047897767636037, 0.140188227821871]
+    np.testing.assert_allclose(left_mount, expected_left, atol=1e-10)
+    assert not np.allclose(left_mount, right_mount, atol=1e-10)

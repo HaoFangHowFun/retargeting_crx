@@ -812,7 +812,7 @@
   </joint>
   <joint name="flange_to_leap" type="fixed">
     <!-- Align middle-finger root (joint_5) with the right-hand mount in flange coordinates. -->
-    <origin rpy="-3.141592653589793 1.56 0" xyz="0.037336626243399 -0.047897767636037 -0.140188227821871" />
+    <origin rpy="0 -1.56 0" xyz="0.037336626243399 0.047897767636037 0.140188227821871" />
     <parent link="flange" />
     <child link="palm_lower" />
   </joint>
