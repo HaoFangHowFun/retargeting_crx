@@ -90,6 +90,13 @@ class ViserLiveVisualizer:
                 load_meshes=True,
                 load_collision_meshes=False,
             )
+            self._command_wrist_marker = self.server.scene.add_icosphere(
+                "/command_preview/wrist_endpoint",
+                radius=0.025,
+                color=(235, 45, 45),
+                subdivisions=3,
+                opacity=1.0,
+            )
             self._urdf_joint_names = tuple(str(name) for name in self.robot_urdf.get_actuated_joint_names())
             self._qpos_indices = self._resolve_urdf_qpos_indices()
             self._hand_renderer = ViserHandObservationRenderer(
@@ -158,6 +165,8 @@ class ViserLiveVisualizer:
         if values.shape != expected_shape or not np.isfinite(values).all():
             raise ValueError(f"qpos must be finite and have shape {expected_shape}.")
         self.command_urdf.update_cfg(values[self._qpos_indices])
+        command_wrist_pose = self.command_urdf._urdf.get_transform("wrist", "world")
+        self._command_wrist_marker.position = tuple(float(value) for value in command_wrist_pose[:3, 3])
 
     def update_observation(self, observation: RetargetingHandObservation) -> None:
         """Publish one canonical human-hand observation beside the robot URDF.

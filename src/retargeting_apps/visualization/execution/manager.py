@@ -179,18 +179,20 @@ def _attach_viser(config_data: dict[str, Any], flow: Any) -> ExecutionVisualizer
     initial_qpos = flow.backend.get_joint_pos()
     visualizer.update_qpos(initial_qpos)
     visualizer.update_command_qpos(initial_qpos)
-    flow.add_command_observer(
-        lambda result: (
-            visualizer.update_qpos(result.actual_qpos),
-            visualizer.update_command_qpos(result.command_qpos),
-        )
-    )
-    flow.add_reset_observer(
-        lambda qpos: (
-            visualizer.update_qpos(qpos),
-            visualizer.update_command_qpos(qpos),
-        )
-    )
+    def update_command(result: ExecutionStepResult) -> None:
+        visualizer.update_qpos(result.actual_qpos)
+        update_preview = getattr(visualizer, "update_command_qpos", None)
+        if callable(update_preview) and result.command_qpos is not None:
+            update_preview(result.command_qpos)
+
+    def update_reset(qpos: Any) -> None:
+        visualizer.update_qpos(qpos)
+        update_preview = getattr(visualizer, "update_command_qpos", None)
+        if callable(update_preview):
+            update_preview(qpos)
+
+    flow.add_command_observer(update_command)
+    flow.add_reset_observer(update_reset)
     _attach_observation_observers(flow, visualizer)
     return visualizer
 
