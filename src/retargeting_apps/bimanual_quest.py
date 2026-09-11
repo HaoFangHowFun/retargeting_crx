@@ -24,9 +24,10 @@ from retargeting_apps.visualization.viser_scene import configure_initial_camera
 from retargeting_apps.visualization.viser_scene import ViserHandObservationRenderer
 from teleoperation.bimanual import BimanualRetargetingPipeline
 from teleoperation.bimanual_execution import BimanualExecutionFlow
-from teleoperation.config import load_detection_source_config
+from teleoperation.config import load_detection_source_config, load_teleoperation_mode_config
 from teleoperation.inputs.quest3 import Quest3BimanualOnlineInput
 from teleoperation.observation_mapping import RelativeWristMapper
+from teleoperation.output import QposOutputFilter
 
 
 def _build_arm(arm: dict, detection_config):
@@ -90,6 +91,11 @@ def main() -> None:
     parser.add_argument("--right-hand-enabled", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--viewer", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--command-hz", type=float, default=20.)
+    parser.add_argument(
+        "--teleoperation-mode",
+        default="configs/teleoperation_modes/real_world.yaml",
+        help="Output-filter mode used for physical CRX commands",
+    )
     parser.add_argument("--duration", type=float, default=0.,
                         help="Auto-stop seconds after tracking initializes; 0 means unlimited")
     args = parser.parse_args()
@@ -121,8 +127,14 @@ def main() -> None:
     )
 
     backend_factory = None
+    arm_output_filters = None
     if args.backend == "dual_crx":
         from teleoperation.backends.bimanual_crx import BimanualCrxRobotBackend
+        mode_config = load_teleoperation_mode_config(resolve_project_path(args.teleoperation_mode))
+        arm_output_filters = (
+            QposOutputFilter(left_robot.initial_qpos[:6], mode_config),
+            QposOutputFilter(right_robot.initial_qpos[:6], mode_config),
+        )
         backend_factory = lambda: BimanualCrxRobotBackend(
             initial_qpos=np.concatenate((left_robot.initial_qpos, right_robot.initial_qpos)),
             control_period=1. / args.command_hz,
@@ -189,7 +201,8 @@ def main() -> None:
     flow = BimanualExecutionFlow(
         source=source, pipeline=pipeline,
         initial_qpos=np.concatenate((left_robot.initial_qpos, right_robot.initial_qpos)),
-        backend_factory=backend_factory, observer=observer, command_hz=args.command_hz, duration=args.duration)
+        backend_factory=backend_factory, observer=observer, command_hz=args.command_hz, duration=args.duration,
+        arm_output_filters=arm_output_filters)
     try:
         flow.run()
     except KeyboardInterrupt:

@@ -3,10 +3,14 @@ import time
 import threading
 import numpy as np
 
+from teleoperation.bimanual import BimanualRetargetedFrame
+from teleoperation.output import QposOutputFilter
+
 
 class BimanualExecutionFlow:
     def __init__(self, *, source, pipeline, initial_qpos, backend_factory=None,
-                 observer=None, command_hz=20., timeout=.25, duration=0.):
+                 observer=None, command_hz=20., timeout=.25, duration=0.,
+                 arm_output_filters: tuple[QposOutputFilter, QposOutputFilter] | None = None):
         if not np.isfinite(command_hz) or command_hz <= 0:
             raise ValueError("command_hz must be positive")
         if not np.isfinite(duration) or duration < 0:
@@ -18,6 +22,12 @@ class BimanualExecutionFlow:
         self.initial_qpos = np.asarray(initial_qpos, dtype=float)
         if self.initial_qpos.shape != (44,) or not np.isfinite(self.initial_qpos).all():
             raise ValueError("expected 44 finite initial positions")
+        if arm_output_filters is not None:
+            if len(arm_output_filters) != 2:
+                raise ValueError("arm_output_filters must contain left and right filters")
+            if any(output_filter.previous_qpos.shape != (6,) for output_filter in arm_output_filters):
+                raise ValueError("each arm output filter must contain six CRX joints")
+        self.arm_output_filters = arm_output_filters
         self.backend_factory, self.observer = backend_factory, observer
         self.period, self.timeout = 1. / command_hz, timeout
         self.backend = None
@@ -28,6 +38,36 @@ class BimanualExecutionFlow:
         self._recovery_started = None
         self._recovery_sequence = None
         self._last_qpos = self.initial_qpos.copy()
+
+    def _reset_arm_output_filters(self, seed: np.ndarray) -> None:
+        """Seed arm-only smoothing from the current measured robot pose."""
+        if self.arm_output_filters is None:
+            return
+        left_filter, right_filter = self.arm_output_filters
+        left_filter.reset(seed[:6])
+        right_filter.reset(seed[22:28])
+
+    def _filter_arm_commands(self, result: BimanualRetargetedFrame) -> BimanualRetargetedFrame:
+        """Smooth only CRX J1-J6 while leaving both sixteen-joint hand targets raw."""
+        if self.arm_output_filters is None:
+            return result
+        left_qpos = np.asarray(result.left_qpos, dtype=float).copy()
+        right_qpos = np.asarray(result.right_qpos, dtype=float).copy()
+        if left_qpos.shape != (22,) or right_qpos.shape != (22,):
+            raise ValueError("bimanual filtering requires 22 positions per robot")
+        left_filter, right_filter = self.arm_output_filters
+        left_qpos[:6] = left_filter.apply(left_qpos[:6])
+        right_qpos[:6] = right_filter.apply(right_qpos[:6])
+        # Match the ordinary execution flow: the temporal objective follows the
+        # filtered command actually visible to the robot, not the raw IK result.
+        self.pipeline.left_retargeter.previous_qpos = left_qpos.copy()
+        self.pipeline.right_retargeter.previous_qpos = right_qpos.copy()
+        return BimanualRetargetedFrame(
+            left_qpos=left_qpos,
+            right_qpos=right_qpos,
+            left_observation=result.left_observation,
+            right_observation=result.right_observation,
+        )
 
     def step(self, sample):
         """Send at most one command for each complete synchronized frame."""
@@ -69,6 +109,7 @@ class BimanualExecutionFlow:
             seed = self._last_qpos if self.backend is None else self.backend.get_joint_pos()
             self.pipeline.left_retargeter.reset(seed[:22])
             self.pipeline.right_retargeter.reset(seed[22:])
+            self._reset_arm_output_filters(seed)
             if not self.pipeline.initialize(sample, seed[:22], seed[22:]):
                 return None
             first_start = self.started_at is None
@@ -89,6 +130,7 @@ class BimanualExecutionFlow:
         age = time.monotonic() - started if received_ns is None else (time.monotonic_ns() - received_ns) / 1e9
         if age > self.source.max_age_s:
             return None
+        result = self._filter_arm_commands(result)
         if self.backend is not None:
             try:
                 self.backend.execute(result.qpos)
