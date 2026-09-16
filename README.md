@@ -98,6 +98,79 @@ and call the same application. New code should use the unified command above.
 Single-arm Quest modes remain available as `online_quest3_kinematic` and
 `online_quest3_mujoco`.
 
+## Joint-Only Output to `ws_fanuc/dual_crx_control`
+
+Use the standalone script for the Python joint bridge's standard ROS topics.
+It runs the existing Quest retargeting flow and controls **both CRX arms only**;
+neither LEAP hand is enabled. No `dual_crx_ros2` gateway, custom messages, or new
+backend configuration is required. The existing dual-arm Viser viewer starts
+automatically in the same process.
+
+First start the joint controllers and bridge in a separate terminal:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source ~/ws_fanuc/install/setup.bash
+export ROS_DOMAIN_ID=185
+export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST
+ros2 launch dual_crx_control teleop_joint.launch.py mock:=true
+```
+
+Mock bringup opens RViz for the dual-arm joint feedback. Add `rviz:=false` if
+you only want the retargeting web viewer or are running without a desktop.
+
+Then run from this repository, using the same ROS domain:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source ~/ws_fanuc/install/setup.bash
+export ROS_DOMAIN_ID=185
+export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST
+.venv/bin/python scripts/run_crx_joint_teleop.py --command-hz 20
+```
+
+Open **http://localhost:9219** on the retargeting computer (or use its IP address
+from another computer). The actual bound URL is printed in the terminal.
+Use `--viewer-port 9220` to select another port, or `--no-viewer` for headless
+operation. Robot meshes show measured arm joints once tracking starts; red wrist
+markers show command targets. Before tracking, the scene shows configured initial
+poses. Finger poses remain placeholders because this script does not control hands.
+
+Optional arguments: `--serial <adb-serial>` and `--duration 60` (seconds after
+calibration; default 0 runs until Ctrl+C). `--help` does not start ROS, Quest, or a viewer.
+Use a Python 3.12 virtual environment compatible with Jazzy and retain ROS's
+`PYTHONPATH` for this command. The script uses the existing model/profile settings
+and arm smoothing alpha (default 0.3) without changing the registered backends.
+
+Commands extract `qpos[:6]` and `qpos[22:28]` from the internal 44-joint vector
+and publish 12 radians to `/teleop/joint_command` (`Float64MultiArray`). Feedback
+comes from `/teleop/joint_states` (`JointState`) and is mapped by joint name.
+Startup and tracking recovery use measured arm positions; finger positions in
+the internal state are configuration placeholders. The script waits up to five
+seconds for complete feedback and a command subscriber, and rejects feedback
+older than 0.5 seconds or with a frozen source timestamp, even if cached messages
+continue arriving. It does not publish a startup/home command.
+
+Ctrl+C, session expiry, or tracking loss stops new targets; the controller can
+still finish its last target. This interface has no gateway lease, software-stop
+service, collision checking, or added speed limiting. Test with mock first;
+physical operation uses `mock:=false` in the first terminal, after stopping mock
+and checking both controllers and measured robot positions. The same script
+then sends physical commands.
+
+Run the script's headless checks, or explicitly opt in to the isolated ROS mock
+test (domain 185, no Quest or physical hardware):
+
+```bash
+env -u PYTHONPATH .venv/bin/python -m pytest tests/test_crx_joint_script.py -q
+# After sourcing ROS and ws_fanuc:
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 CRX_JOINT_ROS_TEST=1 \
+  .venv/bin/python -m pytest tests/test_crx_joint_script.py -k ros_mock -q
+```
+
+The ROS test disables unrelated pytest plugin auto-loading so system ROS launch
+testing plugins do not impose extra packages on the retargeting virtualenv.
+
 ## Frequency and Output Filtering
 
 The default command frequency is **20 Hz**. Change `backend.command_hz=20` on the
