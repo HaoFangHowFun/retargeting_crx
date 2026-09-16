@@ -3,6 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
 
 class _FakeGuiNumberHandle:
@@ -494,7 +495,7 @@ def test_joint_angle_readouts_cover_all_panda_leap_joints_and_qpos_addresses(mon
     Returns:
         None.
     """
-    import mujoco
+    mujoco = pytest.importorskip("mujoco", reason="Optional MuJoCo backend is not installed")
 
     from retargeting.config import load_robot_config
     from retargeting_apps.config import MujocoWebViewerConfig

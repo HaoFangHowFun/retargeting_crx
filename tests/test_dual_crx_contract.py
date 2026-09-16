@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from retargeting_ros.dual_crx_contract import (
+from teleoperation.backends.dual_crx_contract import (
     BIMANUAL_CRX_NAMES,
     CRX_PROFILE_NAMES,
     DUAL_CRX_NAMES,
@@ -60,8 +60,32 @@ def test_rejects_invalid_bimanual_positions(qpos):
         to_bimanual_crx_positions(qpos)
 
 
-def test_publisher_module_is_importable_without_ros():
-    from retargeting_ros.dual_crx_publisher import BimanualDualCrxPublisher, DualCrxPublisher
+@pytest.mark.parametrize("bimanual", [False, True])
+def test_ros_backend_publishes_one_named_target_on_its_channel(monkeypatch, bimanual):
+    import sys
+    from types import SimpleNamespace as NS
+    from retargeting_ros.dual_crx import BimanualCrxRobotBackend, DualCrxRobotBackend
 
-    assert DualCrxPublisher.__name__ == "DualCrxPublisher"
-    assert BimanualDualCrxPublisher.__name__ == "BimanualDualCrxPublisher"
+    def message(**kwargs):
+        return NS(**kwargs, target=NS(header=NS(stamp=None)))
+
+    monkeypatch.setitem(sys.modules, "dual_crx_interfaces.msg", NS(TeleopCommand=message))
+    cls = BimanualCrxRobotBackend if bimanual else DualCrxRobotBackend
+    backend = cls.__new__(cls)
+    backend._client_id = "test"
+    backend._node = NS(get_clock=lambda: NS(now=lambda: NS(to_msg=lambda: "now")))
+    sent = []
+    backend._publisher = NS(publish=sent.append)
+    backend.get_joint_pos = lambda: np.zeros(len(cls.NAMES))
+    qpos = np.arange(len(cls.NAMES), dtype=float)
+    # Exercise the common publisher directly; hand diagnostics have separate tests.
+    result = DualCrxRobotBackend.execute(backend, qpos)
+    assert cls.TOPIC + "/command" == (
+        "/dual_crx/teleop/bimanual/command" if bimanual else "/dual_crx/teleop/command"
+    )
+    assert len(sent) == 1
+    assert sent[0].client_id == "test"
+    assert sent[0].target.header.stamp == "now"
+    assert sent[0].target.name == list(cls.NAMES)
+    assert sent[0].target.position == qpos.tolist()
+    np.testing.assert_array_equal(result.command_qpos, qpos)

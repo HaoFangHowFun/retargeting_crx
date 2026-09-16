@@ -5,7 +5,7 @@ import time
 from types import SimpleNamespace as NS
 import numpy as np
 import pytest
-from teleoperation.backends.bimanual_crx import BimanualCrxRobotBackend
+from retargeting_ros.dual_crx import BimanualCrxRobotBackend
 from teleoperation.backends.dual_crx_contract import BIMANUAL_CRX_NAMES
 from teleoperation.bimanual import BimanualRetargetedFrame
 from teleoperation.bimanual_execution import BimanualExecutionFlow

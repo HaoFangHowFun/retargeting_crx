@@ -1,5 +1,9 @@
 # Physical dual-CRX handoff checkpoint (2026-09-10)
 
+Historical checkpoint: branch/readiness notes and environment commands below describe
+that date. For the current unified dual-arm workflow, use the [README](../README.md)
+and [physical execution guide](bimanual_physical.md).
+
 This note is the handoff boundary between `retargeting_crx` and
 `dual_crx_ros2` for the next operator-supervised physical test. It distinguishes
 the right-arm path that can be tested now from the bimanual path that still
@@ -180,7 +184,9 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q \
   tests/test_dual_crx_startup.py \
   tests/test_bimanual_quest.py \
   tests/test_quest3_input.py
-python scripts/view_bimanual_trajectory.py --headless
+# The synthetic trajectory demo was removed during consolidation.
+# Current offline dual-arm check:
+env -u PYTHONPATH .venv/bin/python -m pytest tests/test_bimanual_quest.py -q
 ```
 
 From `dual_crx_ros2`, use the build/test commands in

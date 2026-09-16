@@ -189,11 +189,12 @@ def test_assets_resolve_and_preserve_source_scales():
             assert 0 < np.max(np.ptp(points, axis=0)) < 2
 
 
-def test_optional_viewer_mesh_loading_without_starting_viewer():
+@pytest.mark.parametrize("robot_name", ["crx5ia_leap_paxini", "crx5ia_leap_paxini_left"])
+def test_optional_viewer_mesh_loading_without_starting_viewer(robot_name):
     yourdfpy = pytest.importorskip("yourdfpy", reason="Optional Viser URDF loader is not installed")
     pytest.importorskip("collada", reason="Optional DAE loader pycollada is not installed")
     model = yourdfpy.URDF.load(
-        str(BUNDLE / "urdf/crx5ia_leap_paxini.urdf"),
+        str(Path("assets/robots") / robot_name / "urdf" / f"{robot_name}.urdf"),
         load_meshes=True, load_collision_meshes=True, build_collision_scene_graph=True,
     )
     assert len(model.actuated_joint_names) == 22

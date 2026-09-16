@@ -22,6 +22,7 @@ class _FakeViserVisualizer:
             None.
         """
         self.qpos_updates = []
+        self.command_updates = []
         self.observation_updates = []
         self.hide_observation_count = 0
         self.wait_for_client_count = 0
@@ -49,6 +50,9 @@ class _FakeViserVisualizer:
             None.
         """
         self.observation_updates.append(observation)
+
+    def update_command_qpos(self, qpos) -> None:
+        self.command_updates.append(np.asarray(qpos).copy())
 
     def hide_observation(self) -> None:
         """Record one request to hide human-hand geometry.
@@ -235,6 +239,7 @@ def test_auto_execution_viewer_selects_viser_for_kinematic_backend(monkeypatch):
     assert manager.DEFAULT_VIEWER_TYPE_BY_BACKEND == {
         "mujoco": "mjviser",
         "kinematic": "viser",
+        "dual_crx": "viser",
     }
 
     visualizer = _FakeViserVisualizer()
@@ -269,11 +274,14 @@ def test_auto_execution_viewer_selects_viser_for_kinematic_backend(monkeypatch):
     assert calls[0]["actuated_joint_names"][0] == "panda_joint1"
     assert visualizer.wait_for_client_count == 1
     np.testing.assert_allclose(visualizer.qpos_updates[0], [0.1, 0.2])
-    flow.command_observers[0](SimpleNamespace(actual_qpos=np.array([0.3, 0.4])))
+    flow.command_observers[0](SimpleNamespace(
+        actual_qpos=np.array([0.3, 0.4]), command_qpos=np.array([0.35, 0.45]),
+    ))
     for observer in flow.reset_observers:
         observer(np.array([0.5, 0.6]))
     np.testing.assert_allclose(visualizer.qpos_updates[1], [0.3, 0.4])
     np.testing.assert_allclose(visualizer.qpos_updates[2], [0.5, 0.6])
+    np.testing.assert_allclose(visualizer.command_updates, [[0.1, 0.2], [0.35, 0.45], [0.5, 0.6]])
     observation = object()
     flow.step_observers[0](SimpleNamespace(retargeted_frame=SimpleNamespace(observation=observation)))
     flow.step_observers[0](SimpleNamespace(retargeted_frame=None))
@@ -388,7 +396,7 @@ class _FakeViserServer:
         self.host = host
         self.port = port
         self.initial_camera = _FakeInitialCamera()
-        self.scene = SimpleNamespace()
+        self.scene = SimpleNamespace(add_icosphere=lambda *args, **kwargs: SimpleNamespace(position=None))
         self.clients = {}
         self.stop_count = 0
         self.instances.append(self)
@@ -447,6 +455,10 @@ class _FakeViserUrdf:
         self.robot_file_path = robot_file_path
         self.options = options
         self.cfg_updates = []
+        self._urdf = SimpleNamespace(
+            update_cfg=lambda qpos: None,
+            get_transform=lambda *args: np.eye(4),
+        )
         self.instances.append(self)
 
     def get_actuated_joint_names(self) -> tuple[str, str, str]:
@@ -537,3 +549,71 @@ def test_viser_live_visualizer_maps_backend_qpos_to_urdf_order(monkeypatch):
     assert urdf.options["root_node_name"] == "/robot_mesh"
     np.testing.assert_allclose(urdf.cfg_updates[0], [20.0, 10.0, 30.0])
     assert sleep_durations == [0.05, 1.0]
+
+
+def test_bimanual_viewer_keeps_measured_meshes_and_command_markers_separate(monkeypatch):
+    from dataclasses import replace
+    from retargeting.core.types import RetargetingHandObservation
+    from retargeting_apps.composition import build_execution_flow
+    from retargeting_apps.main import compose_hydra_base_config
+    from retargeting_apps.visualization.execution import bimanual, manager
+    from teleoperation.bimanual import BimanualRetargetedFrame
+
+    config = compose_hydra_base_config([
+        "app=teleop_exe", "teleoperation_modes=bimanual_quest", "viewer.enabled=true",
+    ])
+    flow = build_execution_flow(config)
+    names = flow.pipeline.left_retargeter.robot_config.actuated_joints
+    robots = []
+
+    class Robot(_FakeViserUrdf):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._visual_root_frame = SimpleNamespace()
+            self.fk_qpos = None
+            self._urdf = SimpleNamespace(update_cfg=self.update_fk, get_transform=self.pose)
+            robots.append(self)
+
+        def get_actuated_joint_names(self):
+            return tuple(reversed(names))
+
+        def update_fk(self, values):
+            self.fk_qpos = np.asarray(values).copy()
+
+        def pose(self, *_):
+            pose = np.eye(4)
+            pose[:3, 3] = self.fk_qpos[:3]
+            return pose
+
+    rendered = []
+
+    class HandRenderer:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def update_observation(self, observation):
+            rendered.append(observation)
+
+    monkeypatch.setitem(sys.modules, "viser", SimpleNamespace(ViserServer=_FakeViserServer))
+    monkeypatch.setitem(sys.modules, "viser.extras", SimpleNamespace(ViserUrdf=Robot))
+    monkeypatch.setattr(bimanual, "ViserHandObservationRenderer", HandRenderer)
+    viewer = manager.create_optional_execution_visualizer(config, flow)
+    commands = np.arange(44, dtype=float) / 100
+    measured = commands + .5
+    flow.backend = SimpleNamespace(get_joint_pos=lambda: measured)
+    observation = RetargetingHandObservation(np.zeros((21, 3)), np.eye(4))
+    result = BimanualRetargetedFrame(
+        commands[:22], commands[22:], replace(observation, handedness="left"), observation,
+    )
+    flow.observer(result)
+    for i, side in enumerate(("left", "right")):
+        indices = slice(i * 22, (i + 1) * 22)
+        np.testing.assert_allclose(robots[i].cfg_updates[-1], measured[indices][::-1])
+        np.testing.assert_allclose(robots[i].fk_qpos, commands[indices][::-1])
+        placement = bimanual.placement_pose(config["bimanual"][side])
+        expected_marker = placement @ np.r_[commands[indices][::-1][:3], 1]
+        np.testing.assert_allclose(viewer.arms[i][2].position, expected_marker[:3])
+        np.testing.assert_allclose(rendered[i].wrist_pose_world, placement)
+    viewer.close()
+    viewer.close()
+    assert viewer.server.stop_count == 1

@@ -42,6 +42,9 @@ retargeting_apps --------> teleoperation --------> retargeting
 retargeting_ros ---------> teleoperation / retargeting
 ```
 
+The application composition root may lazily import `retargeting_ros` to select a
+ROS backend. `teleoperation` must not import ROS adapters or ROS message packages.
+
 Keep runtime ownership flat, with one flow coordinating peer components:
 
 ```text
@@ -69,25 +72,30 @@ Within these boundaries, prefer the flattest reasonable structure and concise, d
 
 ## Development Workflow
 
-Run commands from the repository root. Use the project interpreter for every Python command:
+Run commands from the repository root. Use the local virtual environment for every Python command; do not use conda:
 
 ```bash
-/home/ymr/miniconda3/envs/retargeting/bin/python
+.venv/bin/python
 ```
 
 Setup when needed:
 
 ```bash
 git submodule update --init --recursive
-/home/ymr/miniconda3/envs/retargeting/bin/python -m pip install -e ".[dev]"
+/usr/bin/python3 -m venv .venv
+env -u PYTHONPATH .venv/bin/python -m pip install -e ".[dev,quest3]" pin scikit-learn
+env -u PYTHONPATH .venv/bin/python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
 ```
+
+If system Python lacks `ensurepip`, use the pip bootstrap fallback in
+`docs/configuration-and-development.md` under **Local Test Environment**.
 
 Validate the smallest relevant scope first, then the full headless suite when warranted:
 
 ```bash
-/home/ymr/miniconda3/envs/retargeting/bin/python -m pytest tests/<relevant_test>.py -q
-/home/ymr/miniconda3/envs/retargeting/bin/python -m pytest tests -q
-/home/ymr/miniconda3/envs/retargeting/bin/python -m compileall -q src tests
+env -u PYTHONPATH .venv/bin/python -m pytest tests/<relevant_test>.py -q
+env -u PYTHONPATH .venv/bin/python -m pytest tests -q
+env -u PYTHONPATH .venv/bin/python -m compileall -q src tests
 git diff --check
 ```
 

@@ -264,7 +264,6 @@ class RobotConfig:
     wrist_frame_name: str
     human_hand_scale: float
     benchmark: RobotBenchmarkConfig
-    benchmark_required: bool = True
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "RobotConfig":
@@ -276,8 +275,7 @@ class RobotConfig:
             visual_frame_names=tuple(str(item) for item in data["visual_frame_names"]),
             wrist_frame_name=str(data["wrist_frame_name"]),
             human_hand_scale=float(data["human_hand_scale"]),
-            benchmark=RobotBenchmarkConfig.from_dict(data.get("benchmark", {"wrist_link_name": str(data["wrist_frame_name"]), "fingertips": []})),
-            benchmark_required=bool(data.get("benchmark_required", True)),
+            benchmark=RobotBenchmarkConfig.from_dict(data["benchmark"]),
         )
 
     @property
@@ -293,10 +291,7 @@ class RobotConfig:
             )
         if self.wrist_frame_name not in self.visual_frame_names:
             raise ValueError(f"wrist_frame_name must be included in visual_frame_names: {self.wrist_frame_name}")
-        if self.benchmark_required:
-            self.benchmark.validate(self.visual_frame_names)
-        elif self.benchmark.fingertips and self.benchmark.wrist_link_name not in self.visual_frame_names:
-            raise ValueError("Optional benchmark wrist frame must be included in visual_frame_names.")
+        self.benchmark.validate(self.visual_frame_names)
 
 
 @dataclass(frozen=True)

@@ -37,7 +37,7 @@ def main() -> None:
         qpos = np.asarray(args.qpos if args.qpos is not None else np.zeros(len(joint_names)), dtype=float)
         if qpos.shape != (len(joint_names),):
             raise ValueError(f"--qpos must contain {len(joint_names)} values for {joint_names}")
-        frame_names = ("base_link", "flange", "coact_gripper_body", "coact_left_jaw", "coact_right_jaw")
+        frame_names = ("base_link", "flange", "wrist")
     model = RobotPinocchio(urdf_path, "urdf")
     adaptor = RobotAdaptor(model, joint_names)
     model.compute_forward_kinematics(adaptor.forward_qpos(qpos))

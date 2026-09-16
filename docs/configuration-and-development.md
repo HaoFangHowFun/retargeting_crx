@@ -108,7 +108,7 @@ outputs/<run_name>/
 
 ROS/RViz is optional and is not required for offline replay.
 
-The ROS path expects Ubuntu 22.04 and ROS2 Humble. When using ROS2 with conda, keep the conda Python version consistent with the system Python used by ROS2.
+Legacy Panda ROS paths target Ubuntu 22.04 and ROS2 Humble. The dual-CRX gateway uses ROS2 Jazzy and system Python 3.12. Use a local virtual environment matching the selected ROS distribution.
 
 Install ROS2 Humble by following the [official ROS2 Humble instructions](https://docs.ros.org/en/humble/Installation.html), then install the required ROS packages:
 
@@ -176,7 +176,7 @@ source ~/dual_crx_ros2/install/setup.bash
 python -m retargeting_apps.main app=teleop_exe \
   retargeting_profiles=vector_wrist_joint_crx5ia_leap_paxini \
   teleoperation_modes=real_world \
-  backend=dual_crx
+  +inputs=quest3 +backends=dual_crx
 ```
 
 The backend acquires the RIGHT lease, enables the hand and teleoperation
@@ -210,14 +210,14 @@ The original lab setup targeted a Franka Panda arm with a Leap hand. The IP addr
 3. Launch Leap hand bringup:
 
    ```bash
-   conda activate retargeting
+   source .venv/bin/activate
    ros2 launch leap_hand leap_bringup.py
    ```
 
 4. Prepare real robot ROS nodes:
 
    ```bash
-   conda activate retargeting
+   source .venv/bin/activate
    ros2 launch retargeting_benchmark real_prepare.py
    ```
 
@@ -226,6 +226,32 @@ The original lab setup targeted a Franka Panda arm with a Leap hand. The IP addr
 Leap hand hardware details are in [ws_ros2/src/leaphand_ros2_module/readme.md](../ws_ros2/src/leaphand_ros2_module/readme.md).
 
 ## Development
+
+### Local Test Environment
+
+Use a repository-local virtual environment created with system Python, without conda:
+
+```bash
+/usr/bin/python3 -m venv .venv
+env -u PYTHONPATH .venv/bin/python -m pip install -e ".[dev,quest3]" pin scikit-learn
+env -u PYTHONPATH .venv/bin/python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+env -u PYTHONPATH .venv/bin/python -m pytest tests/test_bimanual_quest.py tests/test_bimanual_execution.py -q
+```
+
+On systems without `ensurepip`, create the environment without pip and bootstrap pip inside it:
+
+```bash
+/usr/bin/python3 -m venv --without-pip .venv
+curl -fL https://bootstrap.pypa.io/get-pip.py -o /tmp/retargeting-crx-get-pip.py
+env -u PYTHONPATH .venv/bin/python /tmp/retargeting-crx-get-pip.py
+```
+
+Then run the installation commands above. The `pin` distribution provides `pinocchio`;
+`scikit-learn` and CPU PyTorch are needed by the retargeter imports. These tests require
+no ROS installation, connected headset, viewer, or hardware. Optional simulation and
+viewer tests require their respective extras. `.venv/` is ignored by Git.
+The `env -u PYTHONPATH` prefix prevents inherited ROS paths from contaminating
+the standalone test environment; retain ROS paths when doing explicit ROS work.
 
 ### Package Boundaries
 
@@ -236,12 +262,14 @@ retargeting_apps -> teleoperation -> retargeting
        |                              ^
        +------------------------------+
 
+retargeting_apps -> retargeting_ros (lazy ROS backend selection)
 retargeting_ros -> teleoperation / retargeting
 ```
 
 - `retargeting` owns canonical domain types, core config, kinematics, optimizers, solvers, and pure metrics.
 - `teleoperation` owns sensor-first inputs, observation mapping, output/command policies, robot backends, and flows.
 - `retargeting_apps` is the only Hydra/CLI composition root and owns artifacts, reports, and replay visualization.
+  It may lazily select backends from `retargeting_ros`; runtime inputs and flows never import ROS adapters.
 - Every `configs/app/<id>.yaml` maps to `retargeting_apps.apps.<id>.run(config, argv)`. The dispatcher imports only the
   selected whitelisted task. `retargeting_apps.composition` builds complete flows; apps do not own per-frame loops.
 - `retargeting_apps.offline_retargeting` and `retargeting_apps.benchmark_report` own artifact/report workflows. There
@@ -259,7 +287,8 @@ HandInput -> SensorHandSample -> HandObservationMapper -> RetargetingHandObserva
           -> Retargeter -> QposOutputFilter -> QposCommandLimiter -> RobotBackend.execute
 ```
 
-`ExecutionFlow` is the only stateful owner of this sequence. It also owns mapping initialization, missing-input
+`ExecutionFlow` owns this sequence for single-arm execution; `BimanualExecutionFlow` coordinates two independent
+mapper/retargeter pairs in one loop for synchronized dual-arm execution. It also owns mapping initialization, missing-input
 hold behavior, wall-clock pacing, source/command counters, passive observers, and the reset contract. AVP live and
 archived acquisition share `teleoperation.inputs.avp.common.decode_avp_sample`; Quest transport and conversion live
 under `teleoperation.inputs.quest3`. The optional `avp_stream` and `aiohttp` dependencies are imported only by live
@@ -305,7 +334,11 @@ Default tests should not start ROS, RViz, cameras, Vision Pro live streaming, re
 
 `app=teleop_exe` is the unified execution path, not a saved-trajectory replay. Teleoperation setup selection lives in
 `teleoperation_modes`; each setup composes `input`, `backend`, and pipeline policy. The same `ExecutionFlow` runs
-online AVP, online Quest 3, archived AVP, MuJoCo, and pure kinematic execution. For live AVP into MuJoCo:
+online AVP, online Quest 3, archived AVP, MuJoCo, and pure kinematic execution. Dual-arm Quest selects
+`teleoperation_modes=bimanual_quest` through this same app and uses `BimanualExecutionFlow`.
+See the [README](../README.md#dual-arm-quest-execution) for preview and ROS commands,
+[frequency settings](../README.md#frequency-and-output-filtering), and the
+[ROS contract](../README.md#ros-interface). For live AVP into MuJoCo:
 
 ```bash
 python -m retargeting_apps.main app=teleop_exe \

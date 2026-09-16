@@ -210,6 +210,8 @@ def test_relative_wrist_mapper_accepts_quest3_config() -> None:
 def test_quest3_sample_retargets_to_panda_leap_23_dof(
     teleoperation_mode: str,
 ) -> None:
+    if teleoperation_mode == "online_quest3_mujoco":
+        pytest.importorskip("mujoco", reason="Optional MuJoCo backend is not installed")
     from retargeting_apps.composition import build_execution_flow
     from retargeting_apps.main import compose_hydra_base_config
     from teleoperation.inputs.avp import AvpOfflineInput

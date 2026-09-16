@@ -1,4 +1,4 @@
-"""Display the heterogeneous CRX bimanual initial scene without Quest input."""
+"""Display the CRX+LEAP bimanual initial scene without Quest input."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from retargeting.core.kinematics import RobotAdaptor, RobotPinocchio
 from retargeting_apps.config import MujocoWebViewerConfig, resolve_project_path
 from retargeting_apps.visualization.execution.viser import _load_viser_dependencies
 from retargeting_apps.visualization.viser_scene import configure_initial_camera
+from retargeting_apps.visualization.execution.bimanual import placement_pose
 
 
 def _load_arm(server, name: str, arm: dict):
@@ -39,11 +40,10 @@ def _load_arm(server, name: str, arm: dict):
     if root is not None:
         root.position = tuple(float(value) for value in placement["position"])
         root.wxyz = np.roll(Rotation.from_euler("xyz", placement["rpy"]).as_quat(), 1)
-    for frame_name in ("base_link", "flange", "wrist", "coact_gripper_body"):
+    for frame_name in ("base_link", "flange", "wrist"):
         if frame_name not in model.frame_names:
             continue
-        pose = model.get_frame_pose(frame_name, qpos=model_qpos).copy()
-        pose[:3, 3] += np.asarray(placement["position"], dtype=float)
+        pose = placement_pose(arm) @ model.get_frame_pose(frame_name, qpos=model_qpos)
         server.scene.add_frame(
             f"/{name}/initial_frames/{frame_name}",
             position=pose[:3, 3],

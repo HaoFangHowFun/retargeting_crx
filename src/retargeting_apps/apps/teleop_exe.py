@@ -161,6 +161,18 @@ def run(config: Any, argv: list[str]) -> dict[str, Any]:
     config_data = to_plain_config_data(config)
     if not isinstance(config_data, dict):
         raise ValueError("Expected teleoperation execution config to be a mapping.")
+    if config_data.get("bimanual") is not None:
+        flow = build_execution_flow(config_data)
+        visualizer = None
+        try:
+            visualizer = create_optional_execution_visualizer(config_data, flow)
+            flow.run()
+            return {"last_sequence": flow.last_sequence}
+        except KeyboardInterrupt:
+            return {"last_sequence": flow.last_sequence}
+        finally:
+            if visualizer is not None:
+                visualizer.close()
     _validate_runtime_options(config_data)
     flow = build_execution_flow(config_data)
     _add_progress_logger(config_data, flow)

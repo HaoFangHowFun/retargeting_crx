@@ -53,12 +53,7 @@ def test_retargeting_profiles_carry_robot_method_parameters():
         assert len(retargeting_runtime_config.joint_position_weights) == qpos_size
         assert len(retargeting_runtime_config.joint_velocity_weights) == qpos_size
         assert len(teleoperation_command_config.max_joint_speed) == qpos_size
-        if robot_config.benchmark_required:
-            assert len(profile_config.target.link_pairs) == 3 * len(robot_config.benchmark.fingertips)
-        else:
-            # Arm-only profiles still need one target pair for wrist-pose solving,
-            # while they intentionally do not declare benchmark fingertips.
-            assert len(profile_config.target.link_pairs) >= 1
+        assert len(profile_config.target.link_pairs) == 3 * len(robot_config.benchmark.fingertips)
 
 
 def test_input_configs_carry_detector_world_calibration():

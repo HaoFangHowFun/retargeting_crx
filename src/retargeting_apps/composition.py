@@ -34,8 +34,10 @@ from teleoperation.config import (
     load_teleoperation_mode_config,
 )
 from teleoperation.flow import BatchRetargetFlow, ExecutionFlow
+from teleoperation.bimanual import BimanualRetargetingPipeline
+from teleoperation.bimanual_execution import BimanualExecutionFlow
 from teleoperation.inputs.avp import AvpOfflineInput, AvpOnlineInput
-from teleoperation.inputs.quest3 import Quest3OnlineInput
+from teleoperation.inputs.quest3 import Quest3BimanualOnlineInput, Quest3OnlineInput
 from teleoperation.observation_mapping import RelativeWristMapper, StaticCalibrationMapper
 from teleoperation.output import QposCommandLimiter, QposOutputFilter
 
@@ -184,16 +186,9 @@ def _build_backend(
             control_period=backend_config.control_period,
         )
     if backend_config.name == "dual_crx":
-        from teleoperation.backends.dual_crx import DualCrxRobotBackend
+        from retargeting_ros.dual_crx import DualCrxRobotBackend
 
         return DualCrxRobotBackend(
-            initial_qpos=robot_config.initial_qpos,
-            control_period=backend_config.control_period,
-        )
-    if backend_config.name == "leap_only":
-        from teleoperation.backends.leap_only import LeapOnlyRobotBackend
-
-        return LeapOnlyRobotBackend(
             initial_qpos=robot_config.initial_qpos,
             control_period=backend_config.control_period,
         )
@@ -221,7 +216,7 @@ def _backend_ctrlrange(backend: Any, qpos_size: int) -> tuple[np.ndarray, np.nda
     return np.full(qpos_size, -np.inf, dtype=float), np.full(qpos_size, np.inf, dtype=float)
 
 
-def build_execution_flow(config: Any) -> ExecutionFlow:
+def build_execution_flow(config: Any) -> ExecutionFlow | BimanualExecutionFlow:
     """Build a complete live or archived backend-neutral execution flow.
 
     Args:
@@ -233,6 +228,8 @@ def build_execution_flow(config: Any) -> ExecutionFlow:
     config_data = to_plain_config_data(config)
     if not isinstance(config_data, dict):
         raise ValueError("Expected execution config to be a mapping.")
+    if config_data.get("bimanual") is not None:
+        return build_bimanual_execution_flow(config_data)
     profile_source = config_data["profile"]
     profile_config = load_retargeting_profile_config(profile_source)
     robot_config = load_robot_config(profile_config.robot)
@@ -335,6 +332,73 @@ def build_execution_flow(config: Any) -> ExecutionFlow:
         ),
         loop=loop,
         max_frames=max_frames,
+    )
+
+
+def build_bimanual_execution_flow(config: dict[str, Any]) -> BimanualExecutionFlow:
+    """Compose synchronized Quest solving; open devices only when the flow runs."""
+    setup = config["bimanual"]
+    detection, input_data = _resolve_input_config(config)
+    if detection.input_device != "quest3" or input_data.get("mode", "online") != "online":
+        raise ValueError("Bimanual execution requires online Quest input.")
+    backend = _resolve_backend_config(config)
+    if backend.name not in {"kinematic", "dual_crx"}:
+        raise ValueError("Bimanual execution supports kinematic preview or dual_crx output.")
+    mode = load_teleoperation_mode_config(config["teleoperation_mode"])
+    if mode.pipeline.use_relative_wrist_alignment is not None:
+        detection = replace(detection, use_relative_wrist_alignment=mode.pipeline.use_relative_wrist_alignment)
+    solver_config = load_solver_config(config.get("solver"))
+    retargeters, mappers = [], []
+    for side in ("left", "right"):
+        profile = load_retargeting_profile_config(setup[side]["profile"])
+        robot = load_robot_config(profile.robot)
+        _, retargeter, _, mapper, _ = _build_retargeting_components(
+            robot_config=robot,
+            profile_config=profile,
+            method_config=load_retargeting_config(profile.method),
+            detection_config=detection.for_hand_side(side),
+            mode_config=mode,
+            solver_config=solver_config,
+            evaluate=False,
+        )
+        retargeters.append(retargeter)
+        mappers.append(mapper)
+    initial_qpos = np.concatenate([r.qpos_init for r in retargeters])
+    arm_filters = hand_filters = backend_factory = None
+    if backend.name == "dual_crx":
+        from retargeting_ros.dual_crx import BimanualCrxRobotBackend
+
+        def backend_factory():
+            return BimanualCrxRobotBackend(
+                initial_qpos=initial_qpos,
+                control_period=backend.control_period,
+                left_hand_enabled=setup.get("left_hand_enabled", False),
+                right_hand_enabled=setup.get("right_hand_enabled", True),
+            )
+
+        output = setup.get("output", {})
+
+        def filters(joints: slice, key: str):
+            filter_mode = replace(mode, output=replace(
+                mode.output, smoothing_alpha=float(output.get(key, mode.output.smoothing_alpha)),
+            ))
+            return tuple(QposOutputFilter(r.qpos_init[joints], filter_mode) for r in retargeters)
+
+        arm_filters = filters(slice(0, 6), "arm_smoothing_alpha")
+        hand_filters = filters(slice(6, 22), "hand_smoothing_alpha")
+    return BimanualExecutionFlow(
+        source=Quest3BimanualOnlineInput(
+            port=int(input_data.get("port", setup["input"].get("port", 8765))),
+            max_age_s=float(input_data.get("max_age_s", setup["input"].get("max_age_s", 0.15))),
+            adb=input_data.get("adb"), serial=input_data.get("serial"),
+        ),
+        pipeline=BimanualRetargetingPipeline(
+            left_mapper=mappers[0], right_mapper=mappers[1],
+            left_retargeter=retargeters[0], right_retargeter=retargeters[1],
+        ),
+        initial_qpos=initial_qpos, backend_factory=backend_factory,
+        command_hz=backend.command_hz, duration=float(setup.get("duration", 0.0)),
+        arm_output_filters=arm_filters, hand_output_filters=hand_filters,
     )
 
 

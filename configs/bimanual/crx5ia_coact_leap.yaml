@@ -1,5 +1,9 @@
+# @package bimanual
 # Homogeneous dual-arm Quest setup. Commands are concatenated left then right.
 name: crx5ia_leap_leap
+duration: 0.0
+left_hand_enabled: false
+right_hand_enabled: true
 left:
   robot: configs/robots/crx5ia_leap_paxini_left.yaml
   profile: configs/retargeting_profiles/vector_wrist_joint_crx5ia_leap_paxini_left.yaml
@@ -18,5 +22,5 @@ input:
   port: 8765
   max_age_s: 0.15
 output:
-  arm_smoothing_alpha: 0.2
+  arm_smoothing_alpha: 0.3
   hand_smoothing_alpha: 0.3

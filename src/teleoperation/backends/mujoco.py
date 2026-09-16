@@ -12,7 +12,8 @@ from teleoperation.backends.base import BackendStepResult
 
 try:
     import mujoco
-except ModuleNotFoundError as _MUJOCO_IMPORT_ERROR:
+except ModuleNotFoundError as exc:
+    _MUJOCO_IMPORT_ERROR = exc
     mujoco = None
 else:
     _MUJOCO_IMPORT_ERROR = None

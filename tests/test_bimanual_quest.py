@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 import yaml
 
 from retargeting.config import load_robot_config
@@ -117,4 +118,73 @@ def test_bimanual_leap_config_uses_left_dual_crx_home_and_22_dof_each():
     assert len(left.actuated_joints) == len(right.actuated_joints) == 22
     np.testing.assert_allclose(left.initial_qpos[:6], [0.0, 0.0, 0.0, 0.0, -np.pi / 2, 0.0])
     np.testing.assert_allclose(right.initial_qpos[:6], [-np.pi / 2, 0.0, np.pi, 0.0, np.pi / 2, 0.0])
-    assert config["output"] == {"arm_smoothing_alpha": .2, "hand_smoothing_alpha": .3}
+    assert config["output"] == {"arm_smoothing_alpha": .3, "hand_smoothing_alpha": .3}
+
+
+@pytest.mark.parametrize("backend", ["kinematic", "dual_crx"])
+def test_unified_bimanual_composition_is_device_free_and_uses_backend_frequency(backend):
+    from retargeting_apps.composition import build_execution_flow
+    from retargeting_apps.main import compose_hydra_base_config
+
+    config = compose_hydra_base_config([
+        "app=teleop_exe", "teleoperation_modes=bimanual_quest",
+        f"backends={backend}", "backend.command_hz=25",
+    ])
+    flow = build_execution_flow(config)
+    assert flow.backend is None
+    assert flow.source._session is None
+    assert flow.period == pytest.approx(1 / 25)
+    assert flow.initial_qpos.shape == (44,)
+    assert not config["viewer"]["enabled"]
+    assert not config["viewer"]["wait_for_client"]
+    if backend == "dual_crx":
+        assert flow.backend_factory is not None
+        for filters in (flow.arm_output_filters, flow.hand_output_filters):
+            assert [f.mode_config.output.smoothing_alpha for f in filters] == [.3, .3]
+    else:
+        assert flow.backend_factory is None
+
+
+def test_unified_bimanual_retargets_one_fresh_frame_without_intermediate_commands():
+    from dataclasses import replace
+    import time
+    from retargeting_apps.composition import build_execution_flow
+    from retargeting_apps.main import compose_hydra_base_config
+    from teleoperation.inputs.quest3.common import decode_quest3_sample
+    from teleoperation.types import BimanualSensorHandSample
+
+    config = compose_hydra_base_config([
+        "app=teleop_exe", "teleoperation_modes=bimanual_quest",
+    ])
+    flow = build_execution_flow(config)
+    # Allow slower CI machines without removing the real freshness check.
+    flow.source.max_age_s = 10.
+    frame = replace(_frame(), received_monotonic_ns=time.monotonic_ns())
+    sample = BimanualSensorHandSample(
+        left=decode_quest3_sample(frame, hand_side="left"),
+        right=decode_quest3_sample(frame, hand_side="right"),
+    )
+    commands = []
+    flow.observer = commands.append
+    result = flow.step(sample)
+    assert result is not None and np.isfinite(result.qpos).all()
+    assert result.qpos.shape == (44,)
+    assert flow.step(sample) is None
+    assert len(commands) == 1
+
+
+def test_legacy_bimanual_cli_uses_unified_runner_and_yaml_defaults(monkeypatch):
+    from retargeting_apps import bimanual_quest
+    from retargeting_apps.main import compose_hydra_base_config
+
+    captured = []
+    monkeypatch.setattr(bimanual_quest, "run", lambda config, argv: captured.append(config))
+    bimanual_quest.main(["--backend", "dual_crx", "--no-viewer", "--duration", "3"])
+    config = captured[0]
+    canonical = compose_hydra_base_config([
+        "app=teleop_exe", "teleoperation_modes=bimanual_quest", "backends=dual_crx",
+    ])
+    assert config["backend"] == canonical["backend"]
+    assert config["bimanual"]["duration"] == 3
+    assert not config["viewer"]["enabled"]
+    assert not config["teleoperation_mode"]["robot_control"]["use_high_freq_interp"]

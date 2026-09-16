@@ -35,7 +35,8 @@ quest3 = [
     "aiohttp>=3.9,<4",
 ]
 replay = [
-    "viser",
+    "viser[urdf]",
+    "pycollada",
 ]
 ros = []
 vision = [

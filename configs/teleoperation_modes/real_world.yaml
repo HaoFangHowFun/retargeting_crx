@@ -3,7 +3,7 @@ name: real_world
 robot_control:
   use_hardware: true
   use_virtual_hardware: false
-  use_high_freq_interp: true
+  use_high_freq_interp: false
 output:
   smooth_output_qpos: true
   smoothing_alpha: 0.3 # When smoothing is enabled, 1.0 disables smoothing.

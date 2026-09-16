@@ -1,9 +1,9 @@
 # @package _global_
 defaults:
   - /retargeting_profiles: vector_wrist_joint_panda_leap_paxini
-  - /teleoperation_modes: offline_kinematic
   - /solvers: nlopt_slsqp
   - _self_
+  - /teleoperation_modes: offline_kinematic
 
 app:
   id: teleop_exe

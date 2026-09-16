@@ -16,7 +16,7 @@ PACKAGE_SOURCE_ROOTS = {
 ALLOWED_PACKAGE_DEPENDENCIES = {
     "retargeting": frozenset(),
     "teleoperation": frozenset({"retargeting"}),
-    "retargeting_apps": frozenset({"retargeting", "teleoperation"}),
+    "retargeting_apps": frozenset({"retargeting", "teleoperation", "retargeting_ros"}),
     "retargeting_ros": frozenset({"retargeting", "teleoperation"}),
 }
 REMOVED_MODULE_PREFIXES = (
@@ -215,7 +215,7 @@ def test_repository_package_dependency_graph_is_declared_and_acyclic():
     assert violations == {}
     assert graph["retargeting"] == set()
     assert graph["teleoperation"] == {"retargeting"}
-    assert graph["retargeting_apps"] == {"retargeting", "teleoperation"}
+    assert graph["retargeting_apps"] == {"retargeting", "teleoperation", "retargeting_ros"}
     assert _dependency_graph_is_acyclic(graph)
 
 

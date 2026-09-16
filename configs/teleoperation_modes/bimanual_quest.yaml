@@ -1,0 +1,34 @@
+# @package _global_
+defaults:
+  - /inputs: quest3
+  - /backends: kinematic
+  - /bimanual: crx5ia_coact_leap
+  - _self_
+
+teleoperation_mode:
+  name: bimanual_quest
+  robot_control:
+    use_hardware: false
+    use_virtual_hardware: false
+    use_high_freq_interp: false
+  output:
+    smooth_output_qpos: true
+    smoothing_alpha: 0.3
+  pipeline:
+    realtime: true
+    startup_move_frames: 0
+    use_relative_wrist_alignment: true
+    missing_frame_policy: hold
+
+input:
+  mode: online
+  port: ${bimanual.input.port}
+  max_age_s: ${bimanual.input.max_age_s}
+  adb: null
+  serial: null
+
+viewer:
+  wait_for_client: false
+  human_keypoint_size: 0.012
+  initial_camera_position: [1.1, 1.1, 0.9]
+  initial_camera_look_at: [0.0, 0.0, 0.35]

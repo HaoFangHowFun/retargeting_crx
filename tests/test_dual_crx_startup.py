@@ -4,8 +4,8 @@ import time
 from types import SimpleNamespace
 import numpy as np
 import pytest
-from teleoperation.backends.dual_crx import DualCrxRobotBackend
-from retargeting_ros.dual_crx_contract import DUAL_CRX_NAMES
+from retargeting_ros.dual_crx import DualCrxRobotBackend
+from teleoperation.backends.dual_crx_contract import DUAL_CRX_NAMES
 
 
 def backend():

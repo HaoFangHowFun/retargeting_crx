@@ -16,6 +16,7 @@ from teleoperation.types import ExecutionStepResult
 DEFAULT_VIEWER_TYPE_BY_BACKEND = {
     "mujoco": "mjviser",
     "kinematic": "viser",
+    "dual_crx": "viser",
 }
 
 
@@ -212,14 +213,24 @@ def create_optional_execution_visualizer(config_data: dict[str, Any], flow: Any)
         return None
     backend_config = load_execution_backend_config(config_data.get("backend"))
     visualizer_type = _resolve_visualizer_type(viewer_config.type, backend_config.name)
-    if visualizer_type == "mjviser":
+    if config_data.get("bimanual") is not None:
+        if visualizer_type != "viser":
+            raise ValueError("Bimanual execution requires a Viser viewer.")
+        from retargeting_apps.visualization.execution.bimanual import BimanualExecutionVisualizer
+
+        visualizer = BimanualExecutionVisualizer(viewer_config, config_data["bimanual"], flow)
+    elif visualizer_type == "mjviser":
         visualizer = _attach_mjviser(config_data, flow)
     elif visualizer_type == "viser":
         visualizer = _attach_viser(config_data, flow)
     else:
         raise ValueError(f"Unsupported execution viewer type: {visualizer_type!r}.")
     if viewer_config.wait_for_client:
-        visualizer.wait_for_client()
+        try:
+            visualizer.wait_for_client()
+        except BaseException:
+            visualizer.close()
+            raise
     return visualizer
 
 
