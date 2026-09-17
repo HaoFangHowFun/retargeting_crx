@@ -44,7 +44,7 @@ sessions in separate ROS domains.
 `backend.command_hz` defaults to 20. Gateway controller rates, command timeouts
 and joint speed limits are configured in the external gateway, independently
 of the retargeting rate. This application generates no interpolation waypoints.
-Physical arm and hand low-pass filters both default to alpha 0.3.
+Physical low-pass filters default to alpha 0.5 for arms and 0.3 for hands.
 
 ## Stop, tracking loss and recovery
 

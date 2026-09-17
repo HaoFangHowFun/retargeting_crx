@@ -140,7 +140,48 @@ Optional arguments: `--serial <adb-serial>` and `--duration 60` (seconds after
 calibration; default 0 runs until Ctrl+C). `--help` does not start ROS, Quest, or a viewer.
 Use a Python 3.12 virtual environment compatible with Jazzy and retain ROS's
 `PYTHONPATH` for this command. The script uses the existing model/profile settings
-and arm smoothing alpha (default 0.3) without changing the registered backends.
+and arm smoothing alpha (default 0.5) without changing the registered backends.
+
+To keep IK at approximately 20 Hz while publishing interpolated commands at
+100 Hz, use the updated ws_fanuc bridge and match its expected input rate:
+
+```bash
+# Robot-stack terminal: start with isolated mock hardware.
+ros2 launch dual_crx_control teleop_joint.launch.py \
+  mock:=true rviz:=false input_rate_hz:=100.0 method:=linear
+
+# Retargeting terminal: same ROS environment/domain as above.
+.venv/bin/python scripts/run_crx_joint_teleop.py \
+  --command-hz 20 --publish-hz 100 --output-interpolation cubic \
+  --interpolation-horizon-ms 50 --duration 60
+```
+
+`--publish-hz` enables an independent steady-clock publisher in the existing ROS
+executor thread. Omit it to retain direct publication at the IK target rate.
+`--output-interpolation` accepts `linear` or `cubic` (default `cubic`). The horizon
+defaults to `1000 / command-hz` milliseconds, not the faster publish period.
+It must be shorter than the flow's target timeout (normally 250 ms). An IK
+update submits a target; each publisher tick samples the curve at the current
+monotonic time. Initial output starts at the measured pose, insufficient cubic
+history uses a linear segment, and endpoints are explicitly held between updates.
+The 0.5 arm output filter still runs once per IK result, not at 100 Hz.
+
+Natural cubic uses recent published samples, as in `RobotRealHighFreq`; it can
+overshoot and does not guarantee velocity continuity between rebuilt curves.
+It adds no motion limits. A target deadline that has already expired is rejected
+without jumping to it. A computation taking a full publish period is discarded
+instead of sending an obsolete sample. These events may interrupt the output;
+frequency alone is not evidence of smoother physical motion. Python scheduling
+and solver load must be measured. Keep the downstream interpolator `linear` for
+this comparison to avoid two cubic stages.
+
+Pause, stop, reset and close cancel the background timer and discard its pending
+curve. Fresh feedback is checked on every active tick; feedback failure stops
+the publisher. No new IK target for the flow timeout suspends publication, even
+though the last endpoint was being repeatedly sent. A fresh target can resume
+from the last published position; tracking recovery explicitly reseeds from
+measured feedback. Neither case commands a home pose. Cancelling publication
+does not cancel motion already accepted by the downstream controller.
 
 Commands extract `qpos[:6]` and `qpos[22:28]` from the internal 44-joint vector
 and publish 12 radians to `/teleop/joint_command` (`Float64MultiArray`). Feedback
@@ -162,7 +203,7 @@ Run the script's headless checks, or explicitly opt in to the isolated ROS mock
 test (domain 185, no Quest or physical hardware):
 
 ```bash
-env -u PYTHONPATH .venv/bin/python -m pytest tests/test_crx_joint_script.py -q
+env -u PYTHONPATH .venv/bin/python -m pytest tests/test_crx_joint_script.py tests/test_crx_joint_interpolation.py -q
 # After sourcing ROS and ws_fanuc:
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 CRX_JOINT_ROS_TEST=1 \
   .venv/bin/python -m pytest tests/test_crx_joint_script.py -k ros_mock -q
@@ -192,8 +233,8 @@ for their existing workflows. Gateway controller frequency and limits are
 separate from retargeting target frequency. Lease heartbeats and startup holds
 are lifecycle messages, not extra solved input frames.
 
-Physical commands use first-order low-pass smoothing with **alpha=0.3 for both
-arms and hands**, matching the reference project. Values live in
+Physical commands use first-order low-pass smoothing with **alpha=0.5 for
+arms and alpha=0.3 for hands**. Values live in
 `configs/bimanual/crx5ia_coact_leap.yaml` under `output.arm_smoothing_alpha` and
 `output.hand_smoothing_alpha`. The formula is
 `q = alpha * target + (1 - alpha) * previous_command`. This filter changes the

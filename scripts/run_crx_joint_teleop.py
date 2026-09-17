@@ -27,13 +27,30 @@ class JointConnection:
     """Script-local transport implementing the existing bimanual flow callbacks."""
 
     def __init__(self, initial_qpos, control_period, *, startup_timeout=5.0,
-                 feedback_timeout=0.5):
+                 feedback_timeout=0.5, publish_hz=None, output_interpolation='cubic',
+                 interpolation_horizon=None, target_timeout=0.25):
         self._actual = checked_qpos(initial_qpos)
-        for value in (control_period, startup_timeout, feedback_timeout):
+        horizon = control_period if interpolation_horizon is None else interpolation_horizon
+        for value in (control_period, startup_timeout, feedback_timeout, horizon, target_timeout):
             if not math.isfinite(value) or value <= 0:
                 raise ValueError('Periods and timeouts must be finite and positive')
+        if publish_hz is not None and (not math.isfinite(publish_hz) or not 0 < publish_hz <= 500):
+            raise ValueError('publish_hz must be finite and in (0, 500]')
+        if output_interpolation not in ('linear', 'cubic'):
+            raise ValueError('output_interpolation must be linear or cubic')
+        if publish_hz is not None and horizon >= target_timeout:
+            raise ValueError('Interpolation horizon must be shorter than the target timeout')
         self._period = control_period
         self._feedback_timeout = feedback_timeout
+        self._publish_hz = publish_hz
+        self._output_method = output_interpolation
+        self._horizon = horizon
+        self._target_timeout = target_timeout
+        self._output_timer = self._interpolator = self._pending_target = None
+        self._last_target_at = None
+        self._last_published = self._actual[ARM_INDICES].copy()
+        self._output_generation = 0
+        self._target_count = self._publish_count = self._rejected_segments = 0
         self._target = self._actual.copy()
         self._lock = threading.RLock()
         self._stopped = self._paused = self._closed = False
@@ -44,6 +61,7 @@ class JointConnection:
         self._node = self._executor = self._thread = self._context = None
         try:
             import rclpy
+            from rclpy.clock import Clock, ClockType
             from rclpy.context import Context
             from rclpy.executors import SingleThreadedExecutor
             from rclpy.node import Node
@@ -73,13 +91,20 @@ class JointConnection:
                         if self._publisher.get_subscription_count() == 0:
                             raise RuntimeError('no joint-command subscriber; start teleop_bridge')
                         self._target = self._actual.copy()
+                        self._reset_output_locked(self._actual[ARM_INDICES])
                     break
                 except RuntimeError as exc:
                     if time.monotonic() >= deadline:
                         raise RuntimeError(f'Joint bridge startup timeout: {exc}') from exc
                     time.sleep(0.01)
+            if self._publish_hz is not None:
+                self._output_timer = self._node.create_timer(
+                    1.0 / self._publish_hz, self._publish_tick,
+                    clock=Clock(clock_type=ClockType.STEADY_TIME), autostart=False)
             self._node.get_logger().info(
-                'Measured arm seed ready; output: /teleop/joint_command. LEAP output disabled.')
+                'Measured arm seed ready; output: /teleop/joint_command. LEAP output disabled. '
+                + ('Direct output.' if publish_hz is None else
+                   f'{publish_hz:g} Hz {output_interpolation}; horizon {horizon*1000:g} ms.'))
         except BaseException:
             self.close()
             raise
@@ -95,6 +120,80 @@ class JointConnection:
             with self._lock:
                 self._spin_error = str(exc)
                 self._stopped = True
+                if self._output_timer is not None:
+                    self._output_timer.cancel()
+
+    def _reset_output_locked(self, seed):
+        """Invalidate in-flight interpolation and stop its timer. Caller holds lock."""
+        self._output_generation += 1
+        self._pending_target = self._last_target_at = None
+        self._last_published = np.asarray(seed, dtype=float).copy()
+        if self._output_timer is not None:
+            self._output_timer.cancel()
+        if self._publish_hz is not None:
+            from retargeting_ros.joint_interpolation import JointCommandInterpolator
+
+            self._interpolator = JointCommandInterpolator(seed, self._output_method)
+
+    def _publish_tick(self):
+        """Sample once at actual time; never burst-replay missed timer slots."""
+        with self._lock:
+            if self._stopped or self._paused or self._last_target_at is None:
+                return
+            try:
+                self._check_feedback()
+            except RuntimeError as exc:
+                self._spin_error = str(exc)
+                self._stopped = True
+                self._reset_output_locked(self._last_published)
+                self._node.get_logger().error(f'Joint publisher stopped: {exc}')
+                return
+            now = time.monotonic()
+            if now - self._last_target_at > self._target_timeout:
+                self._reset_output_locked(self._last_published)
+                self._node.get_logger().warning('Joint publisher suspended: no fresh IK target.')
+                return
+            pending, self._pending_target = self._pending_target, None
+            interpolator, generation = self._interpolator, self._output_generation
+
+        # Fitting happens outside the feedback/stop lock. Resets replace the helper,
+        # and the generation check prevents an obsolete fit from publishing.
+        try:
+            if pending is not None:
+                q, received_at = pending
+                interpolator.set_target(q, received_at, self._horizon, now)
+            values = interpolator.sample(now)
+        except (ValueError, FloatingPointError) as exc:
+            with self._lock:
+                if generation != self._output_generation:
+                    return
+                self._rejected_segments += 1
+                self._reset_output_locked(self._last_published)
+            self._node.get_logger().warning(f'Joint interpolation rejected: {exc}')
+            return
+
+        with self._lock:
+            if generation != self._output_generation or self._stopped or self._paused:
+                return
+            try:
+                self._check_feedback()
+            except RuntimeError as exc:
+                self._spin_error = str(exc)
+                self._stopped = True
+                self._reset_output_locked(self._last_published)
+                return
+            published_at = time.monotonic()
+            if (published_at - self._last_target_at > self._target_timeout
+                    or published_at - now >= 1.0 / self._publish_hz):
+                # A delayed computation cannot refresh old input into a new command.
+                self._rejected_segments += 1
+                self._reset_output_locked(self._last_published)
+                self._node.get_logger().warning('Joint publisher suspended: sample calculation missed its deadline.')
+                return
+            self._publisher.publish(self._command_type(data=values.tolist()))
+            interpolator.record_published(published_at, values)
+            self._last_published = values.copy()
+            self._publish_count += 1
 
     def _receive_state(self, message):
         with self._lock:
@@ -151,6 +250,7 @@ class JointConnection:
         with self._lock:
             self._check_feedback()
             self._target = self._actual.copy()  # Resynchronize; never command a home pose.
+            self._reset_output_locked(self._actual[ARM_INDICES])
 
     def execute(self, qpos):
         from teleoperation.backends.base import BackendStepResult
@@ -160,8 +260,17 @@ class JointConnection:
             self._check_feedback()
             if self._paused:
                 raise RuntimeError('Joint output paused for tracking recovery')
-            self._publisher.publish(self._command_type(data=values[ARM_INDICES].tolist()))
+            if self._publish_hz is None:
+                self._publisher.publish(self._command_type(data=values[ARM_INDICES].tolist()))
+                self._last_published = values[ARM_INDICES].copy()
+                self._publish_count += 1
+            else:
+                self._last_target_at = time.monotonic()
+                self._pending_target = (values[ARM_INDICES].copy(), self._last_target_at)
+                if self._output_timer.is_canceled():
+                    self._output_timer.reset()
             self._target = values
+            self._target_count += 1
             return BackendStepResult(
                 command_qpos=values, actual_qpos=self._actual,
                 diagnostics={'left_hand_output_enabled': 0.0, 'right_hand_output_enabled': 0.0,
@@ -170,11 +279,13 @@ class JointConnection:
     def pause_tracking(self):
         with self._lock:
             self._paused = True
+            self._reset_output_locked(self._last_published)
 
     def resume_tracking(self):
         with self._lock:
             self._check_feedback()
             self._target = self._actual.copy()
+            self._reset_output_locked(self._actual[ARM_INDICES])
             self._paused = False
 
     def assert_tracking(self):
@@ -184,12 +295,14 @@ class JointConnection:
     def request_stop(self, reason):
         with self._lock:
             self._stopped = True
+            self._reset_output_locked(self._last_published)
 
     def close(self):
         with self._lock:
             if self._closed:
                 return
             self._closed = self._stopped = True
+            self._reset_output_locked(self._last_published)
         if self._executor is not None:
             self._executor.shutdown()
         if self._thread is not None:
@@ -214,6 +327,11 @@ def build_flow(args):
     config['input']['serial'] = args.serial
     config['viewer'].update(enabled=args.viewer, port=args.viewer_port, wait_for_client=False)
     flow = build_bimanual_execution_flow(config)
+    if args.publish_hz is not None:
+        horizon = (flow.period if args.interpolation_horizon_ms is None else
+                   args.interpolation_horizon_ms / 1000.0)
+        if horizon >= flow.timeout:
+            raise ValueError('Interpolation horizon must be shorter than the target timeout')
     retargeters = (flow.pipeline.left_retargeter, flow.pipeline.right_retargeter)
     for retargeter in retargeters:
         if tuple(retargeter.robot_config.actuated_joints) != PROFILE_NAMES:
@@ -223,13 +341,24 @@ def build_flow(args):
         'arm_smoothing_alpha', mode.output.smoothing_alpha))
     mode = replace(mode, output=replace(mode.output, smoothing_alpha=alpha))
     flow.arm_output_filters = tuple(QposOutputFilter(r.qpos_init[:6], mode) for r in retargeters)
-    flow.backend_factory = lambda: JointConnection(flow.initial_qpos, flow.period)
+    flow.backend_factory = lambda: JointConnection(
+        flow.initial_qpos, flow.period, publish_hz=args.publish_hz,
+        output_interpolation=args.output_interpolation,
+        interpolation_horizon=(None if args.interpolation_horizon_ms is None else
+                               args.interpolation_horizon_ms / 1000.0),
+        target_timeout=flow.timeout)
     return flow, config
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--command-hz', type=float, default=20.0, help='Maximum target rate (default: 20)')
+    parser.add_argument('--publish-hz', type=float, default=None,
+                        help='Independent ROS output rate, e.g. 100; omitted keeps direct output')
+    parser.add_argument('--output-interpolation', choices=['linear', 'cubic'], default='cubic',
+                        help='Curve used with --publish-hz (default: cubic)')
+    parser.add_argument('--interpolation-horizon-ms', type=float, default=None,
+                        help='Target arrival horizon; defaults to 1000 / command-hz, not publish-hz')
     parser.add_argument('--duration', type=float, default=0.0,
                         help='Seconds after calibration; 0 runs until Ctrl+C')
     parser.add_argument('--serial', default=None, help='ADB headset serial')
@@ -241,6 +370,13 @@ def main(argv=None):
         parser.error('--command-hz must be finite and positive')
     if not math.isfinite(args.duration) or args.duration < 0:
         parser.error('--duration must be finite and nonnegative')
+    if args.publish_hz is not None and (not math.isfinite(args.publish_hz) or not 0 < args.publish_hz <= 500):
+        parser.error('--publish-hz must be finite and in (0, 500]')
+    if args.interpolation_horizon_ms is not None:
+        if not math.isfinite(args.interpolation_horizon_ms) or args.interpolation_horizon_ms <= 0:
+            parser.error('--interpolation-horizon-ms must be finite and positive')
+        if args.publish_hz is None:
+            parser.error('--interpolation-horizon-ms requires --publish-hz')
     if not 1 <= args.viewer_port <= 65535:
         parser.error('--viewer-port must be between 1 and 65535')
     visualizer = None

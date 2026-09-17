@@ -34,9 +34,20 @@ def connection():
     link._received_at = link._advanced_at = 0.0
     link._spin_error = None
     link._feedback_timeout = 0.5
+    link._publish_hz = None
+    link._output_method = 'cubic'
+    link._horizon = .05
+    link._target_timeout = .25
+    link._output_timer = link._interpolator = link._pending_target = None
+    link._last_target_at = None
+    link._last_published = link._actual[script.ARM_INDICES].copy()
+    link._output_generation = 0
+    link._target_count = link._publish_count = link._rejected_segments = 0
     link._context = NS(ok=lambda: True)
     link._thread = NS(is_alive=lambda: True)
-    link._node = NS(get_clock=lambda: NS(now=lambda: NS(nanoseconds=100_000_000_000)))
+    link.logs = []
+    link._node = NS(get_clock=lambda: NS(now=lambda: NS(nanoseconds=100_000_000_000)),
+                    get_logger=lambda: NS(warning=link.logs.append, error=link.logs.append))
     link.commands = []
     link._publisher = NS(publish=lambda msg: link.commands.append(msg.data))
     link._command_type = lambda **kwargs: NS(**kwargs)
@@ -143,8 +154,10 @@ def test_cli_help_and_invalid_timing_do_not_import_ros_or_open_devices():
     )
     subprocess.run([sys.executable, '-c', command], check=True, cwd=ROOT)
     result = subprocess.run([sys.executable, str(SCRIPT), '--help'], capture_output=True, text=True)
-    assert result.returncode == 0 and '--command-hz' in result.stdout
-    for args in (['--command-hz', 'nan'], ['--command-hz', '0'], ['--duration', '-1']):
+    assert result.returncode == 0 and '--command-hz' in result.stdout and '--publish-hz' in result.stdout
+    for args in (['--command-hz', 'nan'], ['--command-hz', '0'], ['--duration', '-1'],
+                 ['--publish-hz', 'nan'], ['--publish-hz', '0'], ['--publish-hz', '501'],
+                 ['--publish-hz', '100', '--interpolation-horizon-ms', '0']):
         result = subprocess.run([sys.executable, str(SCRIPT), *args], capture_output=True, text=True)
         assert result.returncode == 2
         assert 'must be finite' in result.stderr
@@ -153,7 +166,8 @@ def test_cli_help_and_invalid_timing_do_not_import_ros_or_open_devices():
 def test_flow_composition_keeps_measured_seed_and_arm_filtering(monkeypatch):
     from teleoperation.bimanual import BimanualRetargetedFrame
 
-    args = NS(command_hz=20.0, duration=1.0, serial='test-headset', viewer=True, viewer_port=9219)
+    args = NS(command_hz=20.0, duration=1.0, serial='test-headset', viewer=True, viewer_port=9219,
+              publish_hz=100., output_interpolation='cubic', interpolation_horizon_ms=50.)
     flow, config = script.build_flow(args)  # Actual configs/models, but no source.open() or ROS.
     assert config['viewer']['enabled'] and config['viewer']['port'] == 9219
     assert not config['viewer']['wait_for_client']
@@ -162,11 +176,17 @@ def test_flow_composition_keeps_measured_seed_and_arm_filtering(monkeypatch):
     assert flow.hand_output_filters is None
     assert len(flow.arm_output_filters) == 2
     assert all(f.mode_config.output.smooth_output_qpos for f in flow.arm_output_filters)
-    assert all(f.mode_config.output.smoothing_alpha == 0.3 for f in flow.arm_output_filters)
+    assert all(f.mode_config.output.smoothing_alpha == 0.5 for f in flow.arm_output_filters)
     measured = np.full(44, 0.12)
     commands, seeds = [], []
     link = NS(get_joint_pos=lambda: measured.copy(), execute=lambda q: commands.append(q.copy()))
-    monkeypatch.setattr(script, 'JointConnection', lambda initial, period: link)
+    def make_connection(initial, period, **kwargs):
+        assert period == .05
+        assert kwargs == dict(publish_hz=100., output_interpolation='cubic',
+                              interpolation_horizon=.05, target_timeout=flow.timeout)
+        return link
+
+    monkeypatch.setattr(script, 'JointConnection', make_connection)
     pipeline = NS(initialized=False)
     pipeline.left_retargeter = NS(reset=lambda q: seeds.append(q.copy()), previous_qpos=None)
     pipeline.right_retargeter = NS(reset=lambda q: seeds.append(q.copy()), previous_qpos=None)
@@ -187,8 +207,8 @@ def test_flow_composition_keeps_measured_seed_and_arm_filtering(monkeypatch):
     assert not commands
     flow.step(sample(2))
     np.testing.assert_allclose(seeds, np.full((2, 22), 0.12))
-    np.testing.assert_allclose(commands[0][:6], 0.3 * 1. + 0.7 * 0.12)
-    np.testing.assert_allclose(commands[0][22:28], 0.3 * -1. + 0.7 * 0.12)
+    np.testing.assert_allclose(commands[0][:6], 0.5 * 1. + 0.5 * 0.12)
+    np.testing.assert_allclose(commands[0][22:28], 0.5 * -1. + 0.5 * 0.12)
     flow.step(sample(2))
     assert len(commands) == 1
 
@@ -239,7 +259,8 @@ def test_script_no_viewer_never_constructs_visualizer(monkeypatch):
 
 @pytest.mark.skipif(os.environ.get('CRX_JOINT_ROS_TEST') != '1',
                     reason='Set CRX_JOINT_ROS_TEST=1 after sourcing ROS to run isolated mock')
-def test_ros_mock_round_trip_and_cleanup(monkeypatch, tmp_path):
+@pytest.mark.parametrize('publish_hz,solver_load', [(None, False), (100.0, False), (100.0, True)])
+def test_ros_mock_round_trip_and_cleanup(monkeypatch, tmp_path, publish_hz, solver_load):
     import rclpy
     from controller_manager_msgs.srv import ListControllers
     from rclpy.context import Context
@@ -260,9 +281,17 @@ def test_ros_mock_round_trip_and_cleanup(monkeypatch, tmp_path):
     peer = Node('joint_script_test_monitor', context=context)
     executor = SingleThreadedExecutor(context=context)
     executor.add_node(peer)
-    commands = []
+    commands, receipt_times, bridge_targets = [], [], []
+    from sensor_msgs.msg import JointState
+
+    def receive(msg):
+        commands.append(list(msg.data))
+        receipt_times.append(time.monotonic())
+
     peer.create_subscription(Float64MultiArray, '/teleop/joint_command',
-                             lambda msg: commands.append(list(msg.data)), 10)
+                             receive, 100)
+    peer.create_subscription(JointState, '/interpolation/joint_targets',
+                             lambda msg: bridge_targets.append(time.monotonic()), 100)
 
     def wait_for(predicate, timeout=10.0):
         deadline = time.monotonic() + timeout
@@ -270,12 +299,13 @@ def test_ros_mock_round_trip_and_cleanup(monkeypatch, tmp_path):
             executor.spin_once(timeout_sec=0.01)
         assert predicate(), (tmp_path / 'launch.log').read_text()
 
-    process = link = None
+    process = link = observer_thread = None
+    observer_stop = threading.Event()
     try:
         with (tmp_path / 'launch.log').open('w') as log:
             process = subprocess.Popen(
                 ['ros2', 'launch', 'dual_crx_control', 'teleop_joint.launch.py',
-                 'mock:=true', 'rviz:=false'],
+                 'mock:=true', 'rviz:=false', f'input_rate_hz:={publish_hz or 20.0}', 'method:=linear'],
                 stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
             for side in ('left', 'right'):
                 client = peer.create_client(ListControllers, f'/{side}/controller_manager/list_controllers')
@@ -290,7 +320,7 @@ def test_ros_mock_round_trip_and_cleanup(monkeypatch, tmp_path):
                     assert time.monotonic() < deadline, states
                     time.sleep(0.05)  # Do not flood the service while spawners activate.
             initial = np.full(44, 0.123)
-            link = script.JointConnection(initial, 0.05)
+            link = script.JointConnection(initial, 0.05, publish_hz=publish_hz)
             wait_for(lambda: link._publisher.get_subscription_count() >= 2)
             assert not commands
             mock_pose = [0., 0., 0., 0., -np.pi / 2, 0.,
@@ -301,15 +331,85 @@ def test_ros_mock_round_trip_and_cleanup(monkeypatch, tmp_path):
             q[0] += 0.00872665
             q[22] -= 0.00872665
             link.execute(q)
-            wait_for(lambda: len(commands) == 1 and np.allclose(
+            wait_for(lambda: bool(commands) and np.allclose(
                 link.get_joint_pos()[script.ARM_INDICES], q[script.ARM_INDICES]))
-            np.testing.assert_allclose(commands[0], q[script.ARM_INDICES])
+            if publish_hz is None:
+                assert len(commands) == 1
+                np.testing.assert_allclose(commands[0], q[script.ARM_INDICES])
+            else:
+                # First publication starts at the measured pose, not the new target.
+                np.testing.assert_allclose(commands[0], mock_pose, atol=1e-8)
+                solve_times = []
+                if solver_load:
+                    from dataclasses import replace
+                    from test_bimanual_quest import _frame
+                    from teleoperation.inputs.quest3.common import decode_quest3_sample
+                    from teleoperation.types import BimanualSensorHandSample
+
+                    flow, _ = script.build_flow(NS(
+                        command_hz=20., duration=0., serial=None, viewer=False, viewer_port=9219,
+                        publish_hz=100., output_interpolation='cubic', interpolation_horizon_ms=50.))
+
+                    def sensor_sample(index):
+                        frame = replace(_frame(), sequence=index, source_sequence=index,
+                                        received_monotonic_ns=time.monotonic_ns())
+                        return BimanualSensorHandSample(
+                            left=decode_quest3_sample(frame, hand_side='left'),
+                            right=decode_quest3_sample(frame, hand_side='right'))
+
+                    assert flow.pipeline.initialize(sensor_sample(1), q[:22], q[22:])
+                    flow._reset_output_filters(q)
+
+                def observe():
+                    while not observer_stop.is_set():
+                        executor.spin_once(timeout_sec=.01)
+
+                # Timestamp arrivals independently of the IK loop; otherwise solver
+                # time is misreported as transport jitter and queued callbacks burst.
+                observer_thread = threading.Thread(target=observe, name='crx_test_observer')
+                observer_thread.start()
+                start = time.monotonic()
+                next_target = start
+                target_count = 0
+                while time.monotonic() - start < 10.5:
+                    now = time.monotonic()
+                    if now >= next_target:
+                        target = q.copy()
+                        target_count += 1
+                        if solver_load:
+                            solve_start = time.monotonic()
+                            result = flow.pipeline.step(sensor_sample(target_count+1))
+                            assert result is not None
+                            target = flow._filter_commands(result).qpos
+                            solve_times.append(time.monotonic()-solve_start)
+                        else:
+                            target[0] += .001*np.sin(2*np.pi*.5*(now-start))
+                            target[22] -= .001*np.sin(2*np.pi*.5*(now-start))
+                        link.execute(target)
+                        next_target = max(now+.05, time.monotonic())
+                    time.sleep(.001)
+                observer_stop.set()
+                observer_thread.join()
+                for name, timestamps in [('teleop', receipt_times), ('bridge', bridge_targets)]:
+                    times = np.array([t for t in timestamps if start+.25 <= t <= start+10.25])
+                    hz = (len(times)-1)/(times[-1]-times[0])
+                    intervals = np.diff(times)*1000
+                    assert 95 <= hz <= 105, (name, hz)
+                    assert np.percentile(intervals, 99) <= 15, (name, intervals.max())
+                    assert intervals.max() <= 30, (name, intervals.max())
+                    print(f'{name} (solver_load={solver_load}): {hz:.2f} Hz, p99 {np.percentile(intervals,99):.2f} ms, max {intervals.max():.2f} ms')
+                if solve_times:
+                    print(f'Real dual-arm IK: {len(solve_times)} solves, p99 {np.percentile(solve_times,99)*1000:.2f} ms, max {max(solve_times)*1000:.2f} ms')
+                assert link._target_count < link._publish_count / 3
             link.pause_tracking()
+            paused_count = link._publish_count
             time.sleep(0.3)
+            assert link._publish_count == paused_count
             link.assert_tracking()
             link.resume_tracking()
             np.testing.assert_allclose(link.get_joint_pos()[6:22], initial[6:22])
             link.request_stop('test complete')
+            stopped_count = link._publish_count
             with pytest.raises(RuntimeError, match='stopped'):
                 link.execute(q)
             link.close()
@@ -317,8 +417,13 @@ def test_ros_mock_round_trip_and_cleanup(monkeypatch, tmp_path):
             assert context.ok()  # Closing the script must not shut down the monitor.
             assert not link._thread.is_alive()
             executor.spin_once(timeout_sec=0.1)
-            assert len(commands) == 1
+            assert link._publish_count == stopped_count
+            if publish_hz is None:
+                assert len(commands) == 1
     finally:
+        observer_stop.set()
+        if observer_thread is not None:
+            observer_thread.join()
         if link is not None:
             link.close()
         if process is not None and process.poll() is None:
