@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run Quest retargeting into /teleop/joint_command (both CRX arms, no LEAP output)."""
+"""Run Quest retargeting into a namespaced generic JointState target topic."""
 
 import argparse
 from dataclasses import replace
@@ -28,7 +28,7 @@ class JointConnection:
 
     def __init__(self, initial_qpos, control_period, *, startup_timeout=5.0,
                  feedback_timeout=0.5, publish_hz=None, output_interpolation='cubic',
-                 interpolation_horizon=None, target_timeout=0.25):
+                 interpolation_horizon=None, target_timeout=0.25, namespace='crx5ia'):
         self._actual = checked_qpos(initial_qpos)
         horizon = control_period if interpolation_horizon is None else interpolation_horizon
         for value in (control_period, startup_timeout, feedback_timeout, horizon, target_timeout):
@@ -66,19 +66,18 @@ class JointConnection:
             from rclpy.executors import SingleThreadedExecutor
             from rclpy.node import Node
             from sensor_msgs.msg import JointState
-            from std_msgs.msg import Float64MultiArray
         except ImportError as exc:
             raise RuntimeError('Source ROS Jazzy and use a ROS-compatible Python 3.12 venv') from exc
-        self._command_type = Float64MultiArray
+        self._command_type = JointState
+        self._namespace = namespace.strip('/') or 'crx5ia'
         try:
             # Own only this context; do not shut down another application's ROS nodes.
             self._context = Context()
             rclpy.init(args=[], context=self._context)
-            self._node = Node('retargeting_crx_joint', context=self._context)
-            self._publisher = self._node.create_publisher(
-                Float64MultiArray, '/teleop/joint_command', 1)
+            self._node = Node('retargeting_crx_joint', namespace=self._namespace, context=self._context)
+            self._publisher = self._node.create_publisher(JointState, 'joint_targets', 1)
             self._node.create_subscription(
-                JointState, '/teleop/joint_states', self._receive_state, 1)
+                JointState, 'joint_states', self._receive_state, 1)
             self._executor = SingleThreadedExecutor(context=self._context)
             self._executor.add_node(self._node)
             self._thread = threading.Thread(target=self._spin, name='crx_joint_feedback', daemon=True)
@@ -89,7 +88,7 @@ class JointConnection:
                     with self._lock:
                         self._check_feedback()
                         if self._publisher.get_subscription_count() == 0:
-                            raise RuntimeError('no joint-command subscriber; start teleop_bridge')
+                            raise RuntimeError('no joint-target subscriber; start dual_arm.launch.py')
                         self._target = self._actual.copy()
                         self._reset_output_locked(self._actual[ARM_INDICES])
                     break
@@ -102,7 +101,7 @@ class JointConnection:
                     1.0 / self._publish_hz, self._publish_tick,
                     clock=Clock(clock_type=ClockType.STEADY_TIME), autostart=False)
             self._node.get_logger().info(
-                'Measured arm seed ready; output: /teleop/joint_command. LEAP output disabled. '
+                f'Measured arm seed ready; output: /{self._namespace}/joint_targets. LEAP output disabled. '
                 + ('Direct output.' if publish_hz is None else
                    f'{publish_hz:g} Hz {output_interpolation}; horizon {horizon*1000:g} ms.'))
         except BaseException:
@@ -134,6 +133,18 @@ class JointConnection:
             from retargeting_ros.joint_interpolation import JointCommandInterpolator
 
             self._interpolator = JointCommandInterpolator(seed, self._output_method)
+
+    def _joint_state_message(self, values):
+        values = np.asarray(values, dtype=float)
+        if values.shape != (12,) or not np.isfinite(values).all():
+            raise ValueError('CRX target must contain 12 finite joint positions')
+        message = self._command_type()
+        now = self._node.get_clock().now()
+        if hasattr(now, 'to_msg'):
+            message.header.stamp = now.to_msg()
+        message.name = list(ARM_NAMES)
+        message.position = values.tolist()
+        return message
 
     def _publish_tick(self):
         """Sample once at actual time; never burst-replay missed timer slots."""
@@ -190,7 +201,7 @@ class JointConnection:
                 self._reset_output_locked(self._last_published)
                 self._node.get_logger().warning('Joint publisher suspended: sample calculation missed its deadline.')
                 return
-            self._publisher.publish(self._command_type(data=values.tolist()))
+            self._publisher.publish(self._joint_state_message(values))
             interpolator.record_published(published_at, values)
             self._last_published = values.copy()
             self._publish_count += 1
@@ -261,7 +272,7 @@ class JointConnection:
             if self._paused:
                 raise RuntimeError('Joint output paused for tracking recovery')
             if self._publish_hz is None:
-                self._publisher.publish(self._command_type(data=values[ARM_INDICES].tolist()))
+                self._publisher.publish(self._joint_state_message(values[ARM_INDICES]))
                 self._last_published = values[ARM_INDICES].copy()
                 self._publish_count += 1
             else:
@@ -346,12 +357,14 @@ def build_flow(args):
         output_interpolation=args.output_interpolation,
         interpolation_horizon=(None if args.interpolation_horizon_ms is None else
                                args.interpolation_horizon_ms / 1000.0),
-        target_timeout=flow.timeout)
+        target_timeout=flow.timeout, namespace=getattr(args, 'namespace', 'crx5ia'))
     return flow, config
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--namespace', default='crx5ia',
+                        help='ROS namespace for joint_targets and joint_states (default: crx5ia)')
     parser.add_argument('--command-hz', type=float, default=20.0, help='Maximum target rate (default: 20)')
     parser.add_argument('--publish-hz', type=float, default=None,
                         help='Independent ROS output rate, e.g. 100; omitted keeps direct output')
@@ -366,6 +379,8 @@ def main(argv=None):
                         help='Show the existing dual-arm web viewer (default: enabled)')
     parser.add_argument('--viewer-port', type=int, default=9219, help='Web viewer port (default: 9219)')
     args = parser.parse_args(argv)
+    if not args.namespace.strip('/'):
+        parser.error('--namespace must not be empty')
     if not math.isfinite(args.command_hz) or args.command_hz <= 0:
         parser.error('--command-hz must be finite and positive')
     if not math.isfinite(args.duration) or args.duration < 0:
@@ -386,7 +401,7 @@ def main(argv=None):
             from retargeting_apps.visualization.execution.manager import create_optional_execution_visualizer
 
             visualizer = create_optional_execution_visualizer(config, flow)
-        print('Quest joint teleoperation -> /teleop/joint_command; both arms, no LEAP output.', flush=True)
+        print(f'Quest joint teleoperation -> /{args.namespace.strip("/") or "crx5ia"}/joint_targets; both arms, no LEAP output.', flush=True)
         flow.run()
     except KeyboardInterrupt:
         return 0

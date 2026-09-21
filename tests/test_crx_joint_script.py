@@ -49,7 +49,11 @@ def connection():
     link._node = NS(get_clock=lambda: NS(now=lambda: NS(nanoseconds=100_000_000_000)),
                     get_logger=lambda: NS(warning=link.logs.append, error=link.logs.append))
     link.commands = []
-    link._publisher = NS(publish=lambda msg: link.commands.append(msg.data))
+    link.names = []
+    def capture(msg):
+        link.commands.append(list(msg.position))
+        link.names.append(list(msg.name))
+    link._publisher = NS(publish=capture)
     link._command_type = lambda **kwargs: NS(**kwargs)
     return link
 
@@ -183,7 +187,8 @@ def test_flow_composition_keeps_measured_seed_and_arm_filtering(monkeypatch):
     def make_connection(initial, period, **kwargs):
         assert period == .05
         assert kwargs == dict(publish_hz=100., output_interpolation='cubic',
-                              interpolation_horizon=.05, target_timeout=flow.timeout)
+                              interpolation_horizon=.05, target_timeout=flow.timeout,
+                                  namespace='crx5ia')
         return link
 
     monkeypatch.setattr(script, 'JointConnection', make_connection)
@@ -266,7 +271,6 @@ def test_ros_mock_round_trip_and_cleanup(monkeypatch, tmp_path, publish_hz, solv
     from rclpy.context import Context
     from rclpy.executors import SingleThreadedExecutor
     from rclpy.node import Node
-    from std_msgs.msg import Float64MultiArray
 
     monkeypatch.setenv('ROS_DOMAIN_ID', '185')
     monkeypatch.setenv('ROS_AUTOMATIC_DISCOVERY_RANGE', 'LOCALHOST')
@@ -281,17 +285,19 @@ def test_ros_mock_round_trip_and_cleanup(monkeypatch, tmp_path, publish_hz, solv
     peer = Node('joint_script_test_monitor', context=context)
     executor = SingleThreadedExecutor(context=context)
     executor.add_node(peer)
-    commands, receipt_times, bridge_targets = [], [], []
+    commands, receipt_times, interpolated_times = [], [], []
+    command_names = []
     from sensor_msgs.msg import JointState
 
     def receive(msg):
-        commands.append(list(msg.data))
+        commands.append(list(msg.position))
+        command_names.append(list(msg.name))
         receipt_times.append(time.monotonic())
 
-    peer.create_subscription(Float64MultiArray, '/teleop/joint_command',
+    peer.create_subscription(JointState, '/crx5ia/joint_targets',
                              receive, 100)
-    peer.create_subscription(JointState, '/interpolation/joint_targets',
-                             lambda msg: bridge_targets.append(time.monotonic()), 100)
+    peer.create_subscription(JointState, '/crx5ia/interpolated_joint_commands',
+                             lambda msg: interpolated_times.append(time.monotonic()), 100)
 
     def wait_for(predicate, timeout=10.0):
         deadline = time.monotonic() + timeout
@@ -304,11 +310,12 @@ def test_ros_mock_round_trip_and_cleanup(monkeypatch, tmp_path, publish_hz, solv
     try:
         with (tmp_path / 'launch.log').open('w') as log:
             process = subprocess.Popen(
-                ['ros2', 'launch', 'dual_crx_control', 'teleop_joint.launch.py',
-                 'mock:=true', 'rviz:=false', f'input_rate_hz:={publish_hz or 20.0}', 'method:=linear'],
+                ['ros2', 'launch', 'dual_crx_control', 'dual_arm.launch.py',
+                 'namespace:=crx5ia', 'mock:=true', 'rviz:=false',
+                 f'input_rate_hz:={publish_hz or 20.0}', 'method:=linear'],
                 stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
             for side in ('left', 'right'):
-                client = peer.create_client(ListControllers, f'/{side}/controller_manager/list_controllers')
+                client = peer.create_client(ListControllers, f'/crx5ia/{side}/controller_manager/list_controllers')
                 wait_for(client.service_is_ready)
                 deadline = time.monotonic() + 10
                 while True:
@@ -331,10 +338,12 @@ def test_ros_mock_round_trip_and_cleanup(monkeypatch, tmp_path, publish_hz, solv
             q[0] += 0.00872665
             q[22] -= 0.00872665
             link.execute(q)
-            wait_for(lambda: bool(commands) and np.allclose(
-                link.get_joint_pos()[script.ARM_INDICES], q[script.ARM_INDICES]))
+            wait_for(lambda: bool(commands))
+            wait_for(lambda: np.allclose(
+                link.get_joint_pos()[script.ARM_INDICES], q[script.ARM_INDICES]), timeout=5.0)
             if publish_hz is None:
                 assert len(commands) == 1
+                assert command_names[0] == list(script.ARM_NAMES)
                 np.testing.assert_allclose(commands[0], q[script.ARM_INDICES])
             else:
                 # First publication starts at the measured pose, not the new target.
@@ -390,14 +399,22 @@ def test_ros_mock_round_trip_and_cleanup(monkeypatch, tmp_path, publish_hz, solv
                     time.sleep(.001)
                 observer_stop.set()
                 observer_thread.join()
-                for name, timestamps in [('teleop', receipt_times), ('bridge', bridge_targets)]:
-                    times = np.array([t for t in timestamps if start+.25 <= t <= start+10.25])
-                    hz = (len(times)-1)/(times[-1]-times[0])
-                    intervals = np.diff(times)*1000
-                    assert 95 <= hz <= 105, (name, hz)
-                    assert np.percentile(intervals, 99) <= 15, (name, intervals.max())
-                    assert intervals.max() <= 30, (name, intervals.max())
-                    print(f'{name} (solver_load={solver_load}): {hz:.2f} Hz, p99 {np.percentile(intervals,99):.2f} ms, max {intervals.max():.2f} ms')
+                target_times = np.array([t for t in receipt_times if start+.25 <= t <= start+10.25])
+                assert len(target_times) > 500, len(target_times)
+                target_hz = (len(target_times)-1)/(target_times[-1]-target_times[0])
+                target_intervals = np.diff(target_times)*1000
+                assert 75 <= target_hz <= 125, target_hz
+                assert np.percentile(target_intervals, 99) <= 30
+                assert target_intervals.max() <= 100
+                print(f'target (solver_load={solver_load}): {target_hz:.2f} Hz, p99 {np.percentile(target_intervals,99):.2f} ms, max {target_intervals.max():.2f} ms')
+                core_times = np.array([t for t in interpolated_times if start+.25 <= t <= start+10.25])
+                assert len(core_times) > 1000, len(core_times)
+                core_hz = (len(core_times)-1)/(core_times[-1]-core_times[0])
+                core_intervals = np.diff(core_times)*1000
+                assert 250 <= core_hz <= 650, core_hz
+                assert np.percentile(core_intervals, 99) <= 20
+                assert core_intervals.max() <= 100
+                print(f'core (solver_load={solver_load}): {core_hz:.2f} Hz, p99 {np.percentile(core_intervals,99):.2f} ms, max {core_intervals.max():.2f} ms')
                 if solve_times:
                     print(f'Real dual-arm IK: {len(solve_times)} solves, p99 {np.percentile(solve_times,99)*1000:.2f} ms, max {max(solve_times)*1000:.2f} ms')
                 assert link._target_count < link._publish_count / 3
@@ -420,6 +437,7 @@ def test_ros_mock_round_trip_and_cleanup(monkeypatch, tmp_path, publish_hz, solv
             assert link._publish_count == stopped_count
             if publish_hz is None:
                 assert len(commands) == 1
+                assert command_names[0] == list(script.ARM_NAMES)
     finally:
         observer_stop.set()
         if observer_thread is not None:

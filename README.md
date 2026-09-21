@@ -113,11 +113,11 @@ source /opt/ros/jazzy/setup.bash
 source ~/ws_fanuc/install/setup.bash
 export ROS_DOMAIN_ID=185
 export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST
-ros2 launch dual_crx_control teleop_joint.launch.py mock:=true
+ros2 launch dual_crx_control dual_arm.launch.py namespace:=crx5ia mock:=true rviz:=false
 ```
 
-Mock bringup opens RViz for the dual-arm joint feedback. Add `rviz:=false` if
-you only want the retargeting web viewer or are running without a desktop.
+Mock bringup starts the dual-arm simulation without RViz in the example above.
+Set `rviz:=true` when you want the dual-arm graphical feedback view.
 
 Then run from this repository, using the same ROS domain:
 
@@ -126,7 +126,7 @@ source /opt/ros/jazzy/setup.bash
 source ~/ws_fanuc/install/setup.bash
 export ROS_DOMAIN_ID=185
 export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST
-.venv/bin/python scripts/run_crx_joint_teleop.py --command-hz 20
+.venv/bin/python scripts/run_crx_joint_teleop.py --namespace crx5ia --command-hz 20
 ```
 
 Open **http://localhost:9219** on the retargeting computer (or use its IP address
@@ -147,12 +147,12 @@ To keep IK at approximately 20 Hz while publishing interpolated commands at
 
 ```bash
 # Robot-stack terminal: start with isolated mock hardware.
-ros2 launch dual_crx_control teleop_joint.launch.py \
-  mock:=true rviz:=false input_rate_hz:=100.0 method:=linear
+ros2 launch dual_crx_control dual_arm.launch.py \
+  namespace:=crx5ia mock:=true rviz:=false input_rate_hz:=100.0 method:=linear
 
 # Retargeting terminal: same ROS environment/domain as above.
 .venv/bin/python scripts/run_crx_joint_teleop.py \
-  --command-hz 20 --publish-hz 100 --output-interpolation cubic \
+  --namespace crx5ia --command-hz 20 --publish-hz 100 --output-interpolation cubic \
   --interpolation-horizon-ms 50 --duration 60
 ```
 
@@ -184,8 +184,12 @@ measured feedback. Neither case commands a home pose. Cancelling publication
 does not cancel motion already accepted by the downstream controller.
 
 Commands extract `qpos[:6]` and `qpos[22:28]` from the internal 44-joint vector
-and publish 12 radians to `/teleop/joint_command` (`Float64MultiArray`). Feedback
-comes from `/teleop/joint_states` (`JointState`) and is mapped by joint name.
+and publish a named 12-joint `sensor_msgs/msg/JointState` to
+`/crx5ia/joint_targets`. Feedback comes from `/crx5ia/joint_states`
+(`JointState`) and is mapped by joint name. The core `dual_arm.launch.py`
+interpolator consumes the target stream, publishes
+`/crx5ia/interpolated_joint_commands` at 500 Hz, and holds the last accepted
+target when input pauses.
 Startup and tracking recovery use measured arm positions; finger positions in
 the internal state are configuration placeholders. The script waits up to five
 seconds for complete feedback and a command subscriber, and rejects feedback
