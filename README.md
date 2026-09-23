@@ -1,5 +1,70 @@
 # Human-to-Robot Retargeting: Dual CRX + Quest
 
+## Quick Start: Quest 3 + Dual CRX + Sharpa Wave
+
+**Run live hand tracking with two CRX arms and two Sharpa Wave hands in the
+virtual preview.** Run the commands below from the repository root in WSL/Linux.
+Complete [Install and Test](#install-and-test) first if `.venv` is not ready.
+
+### 1. Connect Quest 3
+
+Enable developer mode and hand tracking on the headset, connect it by USB, and
+accept the USB debugging authorization prompt. On WSL, attach the USB device to
+WSL first, then check from the same WSL terminal used to run the application:
+
+```bash
+adb devices -l
+```
+
+The headset must appear with status `device`. If the list is empty, check USB
+attachment to WSL; if it says `unauthorized`, accept the prompt in the headset.
+
+### 2. Start the Sharpa preview
+
+```bash
+env -u PYTHONPATH .venv/bin/python scripts/run_crx_sharpa_joint_teleop.py --backend preview
+```
+
+The application opens Quest Browser. Press **Start tracking** in the headset
+and keep both hands visible and steady until the terminal reports
+`initialized=True`. The initial wrist pose is used for calibration.
+
+On the Windows/desktop browser, open **http://localhost:9219** to view the robots.
+Try wrist translation and rotation, opening and closing each hand, and individual
+finger movements. This mode runs a virtual preview without ROS robot commands.
+Press **Ctrl+C** in the terminal to stop; restart the command to recalibrate.
+
+### 3. Other useful preview modes
+
+**Inspect the initial installation without Quest:**
+
+```bash
+env -u PYTHONPATH .venv/bin/python scripts/view_bimanual_initial.py --config configs/bimanual/crx5ia_sharpa_wave.yaml
+```
+
+Open the same viewer URL, inspect the scene, then stop this process before
+starting live tracking so port 9219 is available.
+
+**Track only the two Sharpa hands with fixed robot wrists:**
+
+```bash
+env -u PYTHONPATH .venv/bin/python scripts/run_sharpa_joint_teleop.py --backend preview
+```
+
+Both live preview commands also accept:
+
+| Option | Purpose |
+| --- | --- |
+| `--duration 60` | Stop 60 seconds after initial calibration. |
+| `--serial <adb-serial>` | Select a headset when multiple ADB devices are attached. |
+| `--viewer-port 9220` | Open the viewer on a different port. |
+| `--no-viewer` | Run without the desktop viewer. |
+
+See the [Sharpa Wave guide](docs/sharpa-wave.md) for ROS mock operation,
+configuration paths, and model coordinate conventions.
+
+## Project Overview
+
 This project builds on [retargeting](https://github.com/Mingrui-Yu/retargeting)
 for the paper *Analyzing Key Objectives in Human-to-Robot Retargeting for Dexterous
 Manipulation*. It retains the core algorithms, offline replay, benchmarking and
