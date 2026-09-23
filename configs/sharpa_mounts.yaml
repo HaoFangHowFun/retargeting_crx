@@ -1,0 +1,10 @@
+# Provisional flange-to-flange attachment for preview, not physical calibration.
+# Edit these transforms and rerun scripts/build_sharpa_models.py.
+left:
+  parent: fanuc_flange
+  xyz: [0.0, 0.0, 0.0]
+  rpy: [0.0, 0.0, 3.141592653589793]
+right:
+  parent: fanuc_flange
+  xyz: [0.0, 0.0, 0.0]
+  rpy: [0.0, 0.0, 0.0]

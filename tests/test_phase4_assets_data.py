@@ -48,8 +48,12 @@ def test_retargeting_profiles_carry_robot_method_parameters():
 
         assert profile_config.method == "configs/retargeting_methods/vector_wrist_joint.yaml"
         assert profile_config.objective.pinch_transition_threshold == 0.1
-        assert profile_config.objective.weights.world_thumb == 10.0
-        assert 0 < retargeting_runtime_config.arm_dof <= qpos_size
+        if retargeting_runtime_config.arm_dof == 0:
+            assert profile_config.objective.weights.world_thumb == 0.0
+            assert profile_config.objective.weights.wrist_rotation == 0.0
+        else:
+            assert profile_config.objective.weights.world_thumb == 10.0
+        assert 0 <= retargeting_runtime_config.arm_dof <= qpos_size
         assert len(retargeting_runtime_config.joint_position_weights) == qpos_size
         assert len(retargeting_runtime_config.joint_velocity_weights) == qpos_size
         assert len(teleoperation_command_config.max_joint_speed) == qpos_size

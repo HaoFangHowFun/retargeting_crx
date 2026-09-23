@@ -1,0 +1,20 @@
+schema_version: 1
+robot: crx5ia_sharpa_wave_left
+format: repository_robot_assets
+entrypoints:
+  urdf: urdf/crx5ia_sharpa_wave_left.urdf
+sources:
+  assets/robots/sharpa_wave_left/urdf/left_sharpa_wave_with_flange.urdf: bb949924510240e77dcf7d480b956fbfb764d0718d12f64aafe38496ea5f6ca0
+  assets/robots/crx5ia_leap_paxini/urdf/crx5ia_leap_paxini.urdf: 89498d4445eec2ea29b3dc420fe345e6389e79f099441a71932bb6b7ed1c08a7
+mount:
+  parent: fanuc_flange
+  xyz:
+  - 0.0
+  - 0.0
+  - 0.0
+  rpy:
+  - 0.0
+  - 0.0
+  - 3.141592653589793
+mount_calibrated: false
+generated_urdf_sha256: 75fd656401a7399de3bfb25dbd501637ef8e8eb19114f357df5c07dcb064b2c5

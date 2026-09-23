@@ -1,0 +1,143 @@
+# @package robot
+name: crx5ia_sharpa_wave_right
+model:
+  type: urdf
+  path: assets/robots/crx5ia_sharpa_wave_right/urdf/crx5ia_sharpa_wave_right.urdf
+  path_is_symlink: false
+actuated_joints:
+- J1
+- J2
+- J3
+- J4
+- J5
+- J6
+- right_thumb_CMC_FE
+- right_thumb_CMC_AA
+- right_thumb_MCP_FE
+- right_thumb_MCP_AA
+- right_thumb_IP
+- right_index_MCP_FE
+- right_index_MCP_AA
+- right_index_PIP
+- right_index_DIP
+- right_middle_MCP_FE
+- right_middle_MCP_AA
+- right_middle_PIP
+- right_middle_DIP
+- right_ring_MCP_FE
+- right_ring_MCP_AA
+- right_ring_PIP
+- right_ring_DIP
+- right_pinky_CMC
+- right_pinky_MCP_FE
+- right_pinky_MCP_AA
+- right_pinky_PIP
+- right_pinky_DIP
+initial_qpos:
+- -1.5707963267948966
+- 0
+- 3.141592653589793
+- 0
+- 1.5707963267948966
+- 0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+visual_frame_names:
+- world
+- ee_mount
+- base_link
+- J1_link
+- J2_link
+- J3_link
+- J4_link
+- J5_link
+- J6_link
+- wbase
+- flange
+- fanuc_flange
+- right_hand_flange
+- right_hand_wrist
+- right_hand_C_MC
+- right_thumb_CMC_VL
+- right_thumb_MC
+- right_thumb_MCP_VL
+- right_thumb_PP
+- right_thumb_DP
+- right_thumb_elastomer
+- right_thumb_fingertip
+- right_index_MCP_VL
+- right_index_PP
+- right_index_MP
+- right_index_DP
+- right_index_elastomer
+- right_index_fingertip
+- right_middle_MCP_VL
+- right_middle_PP
+- right_middle_MP
+- right_middle_DP
+- right_middle_elastomer
+- right_middle_fingertip
+- right_ring_MCP_VL
+- right_ring_PP
+- right_ring_MP
+- right_ring_DP
+- right_ring_elastomer
+- right_ring_fingertip
+- right_pinky_MC
+- right_pinky_MCP_VL
+- right_pinky_PP
+- right_pinky_MP
+- right_pinky_DP
+- right_pinky_elastomer
+- right_pinky_fingertip
+- right_retarget_wrist
+wrist_frame_name: right_retarget_wrist
+human_hand_scale: 1.0
+benchmark:
+  wrist_link_name: right_retarget_wrist
+  fingertips:
+  - link_name: right_thumb_fingertip
+    human_tip_index: 4
+    human_direction_base_index: 3
+    robot_direction_axis: z
+    is_thumb: true
+  - link_name: right_index_fingertip
+    human_tip_index: 8
+    human_direction_base_index: 7
+    robot_direction_axis: z
+    is_thumb: false
+  - link_name: right_middle_fingertip
+    human_tip_index: 12
+    human_direction_base_index: 11
+    robot_direction_axis: z
+    is_thumb: false
+  - link_name: right_ring_fingertip
+    human_tip_index: 16
+    human_direction_base_index: 15
+    robot_direction_axis: z
+    is_thumb: false
+  - link_name: right_pinky_fingertip
+    human_tip_index: 20
+    human_direction_base_index: 19
+    robot_direction_axis: z
+    is_thumb: false

@@ -1,0 +1,123 @@
+# @package profile
+name: vector_wrist_joint_sharpa_wave_left
+robot: configs/robots/sharpa_wave_left.yaml
+method: configs/retargeting_methods/vector_wrist_joint.yaml
+target:
+  wrist_link_name: left_retarget_wrist
+  link_pairs:
+  - - world
+    - left_thumb_fingertip
+  - - left_retarget_wrist
+    - left_thumb_fingertip
+  - - left_retarget_wrist
+    - left_index_fingertip
+  - - left_retarget_wrist
+    - left_middle_fingertip
+  - - left_retarget_wrist
+    - left_ring_fingertip
+  - - left_retarget_wrist
+    - left_pinky_fingertip
+  - - left_thumb_fingertip
+    - left_index_fingertip
+  - - left_thumb_fingertip
+    - left_middle_fingertip
+  - - left_thumb_fingertip
+    - left_ring_fingertip
+  - - left_thumb_fingertip
+    - left_pinky_fingertip
+  - - left_thumb_DP
+    - left_thumb_fingertip
+  - - left_index_DP
+    - left_index_fingertip
+  - - left_middle_DP
+    - left_middle_fingertip
+  - - left_ring_DP
+    - left_ring_fingertip
+  - - left_pinky_DP
+    - left_pinky_fingertip
+objective:
+  pinch_transition_threshold: 0.1
+  pinch_contact_threshold: 0.01
+  pinch_sigmoid_slope: 10.0
+  weights:
+    world_thumb: 0.0
+    wrist_fingertip: 1.0
+    thumb_primary: 10.0
+    fingertip_orientation: 10.0
+    wrist_rotation: 0.0
+    arm_link_vector: 10.0
+    arm_wrist_rotation: 1.0
+retargeting:
+  arm_dof: 0
+  human_wrist_index: 0
+  joint_position_weights:
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  joint_velocity_weights:
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+  - 0.01
+teleoperation:
+  max_joint_speed:
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+  - 1.0
+joint_limit_overrides: []

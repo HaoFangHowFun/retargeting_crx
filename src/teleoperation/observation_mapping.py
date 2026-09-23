@@ -218,6 +218,7 @@ class RelativeWristMapper(StaticCalibrationMapper):
         self.wrist_frame_name = str(wrist_frame_name)
         self._robot_initial_wrist_pose: np.ndarray | None = None
         self._sensor_initial_wrist_pose: np.ndarray | None = None
+        self.align_wrist_rotation = False
 
     def initialize(self, sample: SensorHandSample, robot_qpos: np.ndarray) -> bool:
         """Capture relative wrist origins using the current measured robot state.
@@ -257,6 +258,12 @@ class RelativeWristMapper(StaticCalibrationMapper):
         wrist_pose_world[:3, 3] += (
             self._robot_initial_wrist_pose[:3, 3] - self._sensor_initial_wrist_pose[:3, 3]
         )
+        if self.align_wrist_rotation:
+            # Apply sensor-world angular displacement to the measured robot wrist.
+            wrist_pose_world[:3, :3] = (
+                wrist_pose_world[:3, :3] @ self._sensor_initial_wrist_pose[:3, :3].T
+                @ self._robot_initial_wrist_pose[:3, :3]
+            )
         return RetargetingHandObservation(
             keypoints_wrist=observation.keypoints_wrist,
             wrist_pose_world=wrist_pose_world,
@@ -277,6 +284,25 @@ class RelativeWristMapper(StaticCalibrationMapper):
         """
         self._robot_initial_wrist_pose = None
         self._sensor_initial_wrist_pose = None
+
+
+class FixedWristMapper(RelativeWristMapper):
+    """Retarget local finger shape while a hand-only model's wrist stays fixed."""
+
+    def map(self, sample: SensorHandSample) -> RetargetingHandObservation | None:
+        observation = StaticCalibrationMapper.map(self, sample)
+        if observation is None:
+            return None
+        if self._robot_initial_wrist_pose is None:
+            raise RuntimeError("Fixed wrist mapping requires initialization.")
+        return RetargetingHandObservation(
+            keypoints_wrist=observation.keypoints_wrist,
+            wrist_pose_world=self._robot_initial_wrist_pose.copy(),
+            timestamp=observation.timestamp,
+            handedness=observation.handedness,
+            keypoint_2d=observation.keypoint_2d,
+            raw=observation.raw,
+        )
 
 
 class AvpRelativeWristMapper(RelativeWristMapper):

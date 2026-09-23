@@ -242,8 +242,8 @@ class RetargetingRuntimeConfig:
         Returns:
             None.
         """
-        if not 0 < self.arm_dof <= qpos_size:
-            raise ValueError(f"arm_dof must be in [1, {qpos_size}], got {self.arm_dof}.")
+        if not 0 <= self.arm_dof <= qpos_size:
+            raise ValueError(f"arm_dof must be in [0, {qpos_size}], got {self.arm_dof}.")
         if self.human_wrist_index < 0:
             raise ValueError("human_wrist_index must be non-negative.")
         for field_name, values in [

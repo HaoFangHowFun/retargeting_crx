@@ -38,7 +38,7 @@ from teleoperation.bimanual import BimanualRetargetingPipeline
 from teleoperation.bimanual_execution import BimanualExecutionFlow
 from teleoperation.inputs.avp import AvpOfflineInput, AvpOnlineInput
 from teleoperation.inputs.quest3 import Quest3BimanualOnlineInput, Quest3OnlineInput
-from teleoperation.observation_mapping import RelativeWristMapper, StaticCalibrationMapper
+from teleoperation.observation_mapping import FixedWristMapper, RelativeWristMapper, StaticCalibrationMapper
 from teleoperation.output import QposCommandLimiter, QposOutputFilter
 
 
@@ -111,7 +111,11 @@ def _build_retargeting_components(
         solver_config=solver_config,
     )
     output_filter = QposOutputFilter(retargeter.qpos_init, mode_config)
-    mapper = _build_mapper(detection_config, robot_config, robot_adaptor, robot_model)
+    if profile_config.retargeting.arm_dof == 0:
+        mapper = FixedWristMapper(detection_config, robot_config.human_hand_scale,
+                                  robot_adaptor, robot_model, robot_config.wrist_frame_name)
+    else:
+        mapper = _build_mapper(detection_config, robot_config, robot_adaptor, robot_model)
     evaluator = RobotBenchmark(robot_adaptor, robot_config.benchmark) if evaluate else None
     return robot_adaptor, retargeter, output_filter, mapper, evaluator
 
@@ -335,11 +339,11 @@ def build_execution_flow(config: Any) -> ExecutionFlow | BimanualExecutionFlow:
     )
 
 
-def build_bimanual_execution_flow(config: dict[str, Any]) -> BimanualExecutionFlow:
+def build_bimanual_execution_flow(config: dict[str, Any], *, source=None) -> BimanualExecutionFlow:
     """Compose synchronized Quest solving; open devices only when the flow runs."""
     setup = config["bimanual"]
     detection, input_data = _resolve_input_config(config)
-    if detection.input_device != "quest3" or input_data.get("mode", "online") != "online":
+    if source is None and (detection.input_device != "quest3" or input_data.get("mode", "online") != "online"):
         raise ValueError("Bimanual execution requires online Quest input.")
     backend = _resolve_backend_config(config)
     if backend.name not in {"kinematic", "dual_crx"}:
@@ -361,9 +365,13 @@ def build_bimanual_execution_flow(config: dict[str, Any]) -> BimanualExecutionFl
             solver_config=solver_config,
             evaluate=False,
         )
+        mapper.align_wrist_rotation = bool(setup.get("relative_wrist_rotation", False))
         retargeters.append(retargeter)
         mappers.append(mapper)
     initial_qpos = np.concatenate([r.qpos_init for r in retargeters])
+    robot_dofs = tuple(len(r.qpos_init) for r in retargeters)
+    arm_dofs = tuple(r.arm_dof for r in retargeters)
+    command_limiters = None
     arm_filters = hand_filters = backend_factory = None
     if backend.name == "dual_crx":
         from retargeting_ros.dual_crx import BimanualCrxRobotBackend
@@ -376,18 +384,27 @@ def build_bimanual_execution_flow(config: dict[str, Any]) -> BimanualExecutionFl
                 right_hand_enabled=setup.get("right_hand_enabled", True),
             )
 
-        output = setup.get("output", {})
-
-        def filters(joints: slice, key: str):
+    output = setup.get("output", {})
+    if backend.name == "dual_crx" or output.get("limit_joint_speed", False):
+        def filters(arm: bool, key: str):
             filter_mode = replace(mode, output=replace(
                 mode.output, smoothing_alpha=float(output.get(key, mode.output.smoothing_alpha)),
             ))
-            return tuple(QposOutputFilter(r.qpos_init[joints], filter_mode) for r in retargeters)
+            return tuple(QposOutputFilter(r.qpos_init[:r.arm_dof] if arm else r.qpos_init[r.arm_dof:],
+                                          filter_mode) for r in retargeters)
 
-        arm_filters = filters(slice(0, 6), "arm_smoothing_alpha")
-        hand_filters = filters(slice(6, 22), "hand_smoothing_alpha")
+        arm_filters = filters(True, "arm_smoothing_alpha")
+        hand_filters = filters(False, "hand_smoothing_alpha")
+    if output.get("limit_joint_speed", False):
+        command_limiters = tuple(
+            QposCommandLimiter(
+                r.qpos_init,
+                np.asarray(load_teleoperation_command_config(setup[side]["profile"], robot_config=r.robot_config).max_joint_speed),
+                backend.command_hz, r.optimizer.joint_limits[:, 0], r.optimizer.joint_limits[:, 1],
+            ) for side, r in zip(("left", "right"), retargeters)
+        )
     return BimanualExecutionFlow(
-        source=Quest3BimanualOnlineInput(
+        source=source if source is not None else Quest3BimanualOnlineInput(
             port=int(input_data.get("port", setup["input"].get("port", 8765))),
             max_age_s=float(input_data.get("max_age_s", setup["input"].get("max_age_s", 0.15))),
             adb=input_data.get("adb"), serial=input_data.get("serial"),
@@ -399,6 +416,7 @@ def build_bimanual_execution_flow(config: dict[str, Any]) -> BimanualExecutionFl
         initial_qpos=initial_qpos, backend_factory=backend_factory,
         command_hz=backend.command_hz, duration=float(setup.get("duration", 0.0)),
         arm_output_filters=arm_filters, hand_output_filters=hand_filters,
+        robot_dofs=robot_dofs, arm_dofs=arm_dofs, command_limiters=command_limiters,
     )
 
 

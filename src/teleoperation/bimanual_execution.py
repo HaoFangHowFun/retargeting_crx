@@ -4,14 +4,16 @@ import threading
 import numpy as np
 
 from teleoperation.bimanual import BimanualRetargetedFrame
-from teleoperation.output import QposOutputFilter
+from teleoperation.output import QposCommandLimiter, QposOutputFilter
 
 
 class BimanualExecutionFlow:
     def __init__(self, *, source, pipeline, initial_qpos, backend_factory=None,
                  observer=None, command_hz=20., timeout=.25, duration=0.,
                  arm_output_filters: tuple[QposOutputFilter, QposOutputFilter] | None = None,
-                 hand_output_filters: tuple[QposOutputFilter, QposOutputFilter] | None = None):
+                 hand_output_filters: tuple[QposOutputFilter, QposOutputFilter] | None = None,
+                 robot_dofs=(22, 22), arm_dofs=(6, 6),
+                 command_limiters: tuple[QposCommandLimiter, QposCommandLimiter] | None = None):
         if not np.isfinite(command_hz) or command_hz <= 0:
             raise ValueError("command_hz must be positive")
         if not np.isfinite(duration) or duration < 0:
@@ -20,19 +22,27 @@ class BimanualExecutionFlow:
         self._duration_expired = threading.Event()
         self._duration_timer = None
         self.source, self.pipeline = source, pipeline
-        self.initial_qpos = np.asarray(initial_qpos, dtype=float)
-        if self.initial_qpos.shape != (44,) or not np.isfinite(self.initial_qpos).all():
-            raise ValueError("expected 44 finite initial positions")
-        if arm_output_filters is not None:
-            if len(arm_output_filters) != 2:
-                raise ValueError("arm_output_filters must contain left and right filters")
-            if any(output_filter.previous_qpos.shape != (6,) for output_filter in arm_output_filters):
-                raise ValueError("each arm output filter must contain six CRX joints")
-        if hand_output_filters is not None:
-            if len(hand_output_filters) != 2:
-                raise ValueError("hand_output_filters must contain left and right filters")
-            if any(output_filter.previous_qpos.shape != (16,) for output_filter in hand_output_filters):
-                raise ValueError("each hand output filter must contain sixteen LEAP joints")
+        if (len(robot_dofs) != 2 or len(arm_dofs) != 2
+                or any(isinstance(n, bool) or not isinstance(n, int) or n <= 0 for n in robot_dofs)
+                or any(isinstance(a, bool) or not isinstance(a, int) or not 0 <= a <= n
+                       for a, n in zip(arm_dofs, robot_dofs))):
+            raise ValueError("Expected two positive robot dimensions and valid arm dimensions")
+        self.robot_dofs, self.arm_dofs = tuple(robot_dofs), tuple(arm_dofs)
+        self.robot_slices = (slice(0, robot_dofs[0]), slice(robot_dofs[0], sum(robot_dofs)))
+        self.initial_qpos = np.asarray(initial_qpos, dtype=float).copy()
+        if self.initial_qpos.shape != (sum(robot_dofs),) or not np.isfinite(self.initial_qpos).all():
+            raise ValueError(f"expected {sum(robot_dofs)} finite initial positions")
+        for label, filters, sizes in (
+            ("arm", arm_output_filters, arm_dofs),
+            ("hand", hand_output_filters, [n - a for n, a in zip(robot_dofs, arm_dofs)]),
+            ("command", command_limiters, robot_dofs),
+        ):
+            if filters is not None:
+                if len(filters) != 2:
+                    raise ValueError(f"{label} filters must contain left and right filters")
+                if any(f.previous_qpos.shape != (n,) for f, n in zip(filters, sizes)):
+                    raise ValueError(f"{label} filter dimensions must match the configured joints")
+        self.command_limiters = command_limiters
         self.arm_output_filters = arm_output_filters
         self.hand_output_filters = hand_output_filters
         self.backend_factory, self.observer = backend_factory, observer
@@ -45,43 +55,47 @@ class BimanualExecutionFlow:
         self._recovery_started = None
         self._recovery_sequence = None
         self._last_qpos = self.initial_qpos.copy()
+        self.command_count = self.stale_count = 0
+        self.last_solve_ms = 0.0
 
     def _reset_output_filters(self, seed: np.ndarray) -> None:
         """Seed arm and hand smoothing from the current measured robot pose."""
-        if self.arm_output_filters is not None:
-            left_filter, right_filter = self.arm_output_filters
-            left_filter.reset(seed[:6])
-            right_filter.reset(seed[22:28])
-        if self.hand_output_filters is not None:
-            left_filter, right_filter = self.hand_output_filters
-            left_filter.reset(seed[6:22])
-            right_filter.reset(seed[28:])
+        for i, joints in enumerate(self.robot_slices):
+            qpos, arm_dof = seed[joints], self.arm_dofs[i]
+            if self.arm_output_filters is not None:
+                self.arm_output_filters[i].reset(qpos[:arm_dof])
+            if self.hand_output_filters is not None:
+                self.hand_output_filters[i].reset(qpos[arm_dof:])
+            if self.command_limiters is not None:
+                self.command_limiters[i].reset(qpos)
 
     def _filter_commands(self, result: BimanualRetargetedFrame) -> BimanualRetargetedFrame:
-        """Apply the independently configured CRX and LEAP output filters."""
-        if self.arm_output_filters is None and self.hand_output_filters is None:
+        """Filter and optionally limit commands in each robot's configured order."""
+        if self.arm_output_filters is None and self.hand_output_filters is None and self.command_limiters is None:
             return result
-        left_qpos = np.asarray(result.left_qpos, dtype=float).copy()
-        right_qpos = np.asarray(result.right_qpos, dtype=float).copy()
-        if left_qpos.shape != (22,) or right_qpos.shape != (22,):
-            raise ValueError("bimanual filtering requires 22 positions per robot")
-        if self.arm_output_filters is not None:
-            left_filter, right_filter = self.arm_output_filters
-            left_qpos[:6] = left_filter.apply(left_qpos[:6])
-            right_qpos[:6] = right_filter.apply(right_qpos[:6])
-        if self.hand_output_filters is not None:
-            left_filter, right_filter = self.hand_output_filters
-            left_qpos[6:] = left_filter.apply(left_qpos[6:])
-            right_qpos[6:] = right_filter.apply(right_qpos[6:])
-        # Match the ordinary execution flow: the temporal objective follows the
-        # filtered command actually visible to the robot, not the raw IK result.
-        self.pipeline.left_retargeter.previous_qpos = left_qpos.copy()
-        self.pipeline.right_retargeter.previous_qpos = right_qpos.copy()
+        commands = []
+        for i, raw in enumerate((result.left_qpos, result.right_qpos)):
+            qpos = np.asarray(raw, dtype=float).copy()
+            if qpos.shape != (self.robot_dofs[i],) or not np.isfinite(qpos).all():
+                raise ValueError("bimanual filtering requires finite configured robot dimensions")
+            arm_dof = self.arm_dofs[i]
+            if self.arm_output_filters is not None:
+                qpos[:arm_dof] = self.arm_output_filters[i].apply(qpos[:arm_dof])
+            if self.hand_output_filters is not None:
+                qpos[arm_dof:] = self.hand_output_filters[i].apply(qpos[arm_dof:])
+            if self.command_limiters is not None:
+                qpos = self.command_limiters[i].apply(qpos)
+                # Keep smoothing state at the limited command, preventing windup.
+                if self.arm_output_filters is not None:
+                    self.arm_output_filters[i].reset(qpos[:arm_dof])
+                if self.hand_output_filters is not None:
+                    self.hand_output_filters[i].reset(qpos[arm_dof:])
+            commands.append(qpos)
+        self.pipeline.left_retargeter.previous_qpos = commands[0].copy()
+        self.pipeline.right_retargeter.previous_qpos = commands[1].copy()
         return BimanualRetargetedFrame(
-            left_qpos=left_qpos,
-            right_qpos=right_qpos,
-            left_observation=result.left_observation,
-            right_observation=result.right_observation,
+            left_qpos=commands[0], right_qpos=commands[1],
+            left_observation=result.left_observation, right_observation=result.right_observation,
         )
 
     def step(self, sample):
@@ -105,7 +119,9 @@ class BimanualExecutionFlow:
             if now - self._recovery_started < .3:
                 return None
             if self.backend is not None:
-                self.backend.resume_tracking()
+                if self.backend.resume_tracking() is False:
+                    self._recovery_started = None
+                    return None
             if self._duration_expired.is_set():
                 return None
             # Resume setup can block: calibrate using a NEW sample on the next tick.
@@ -122,10 +138,11 @@ class BimanualExecutionFlow:
                 # Startup may take seconds. Acquire a new frame before calibration.
                 return None
             seed = self._last_qpos if self.backend is None else self.backend.get_joint_pos()
-            self.pipeline.left_retargeter.reset(seed[:22])
-            self.pipeline.right_retargeter.reset(seed[22:])
+            self.pipeline.left_retargeter.reset(seed[self.robot_slices[0]])
+            self.pipeline.right_retargeter.reset(seed[self.robot_slices[1]])
+            self._last_qpos = np.asarray(seed, dtype=float).copy()
             self._reset_output_filters(seed)
-            if not self.pipeline.initialize(sample, seed[:22], seed[22:]):
+            if not self.pipeline.initialize(sample, seed[self.robot_slices[0]], seed[self.robot_slices[1]]):
                 return None
             first_start = self.started_at is None
             if first_start:
@@ -137,6 +154,7 @@ class BimanualExecutionFlow:
                 print(f"Quest tracking initialized; automatic stop in {self.duration:g} seconds.", flush=True)
         started = time.monotonic()
         result = self.pipeline.step(sample)
+        self.last_solve_ms = (time.monotonic() - started) * 1000.0
         self.last_sequence = sample.source_index
         if result is None or self._duration_expired.is_set():
             return None
@@ -144,15 +162,25 @@ class BimanualExecutionFlow:
         received_ns = getattr(getattr(sample.left, "raw", None), "received_monotonic_ns", None)
         age = time.monotonic() - started if received_ns is None else (time.monotonic_ns() - received_ns) / 1e9
         if age > self.source.max_age_s:
+            self.stale_count += 1
+            self.pipeline.left_retargeter.previous_qpos = self._last_qpos[self.robot_slices[0]].copy()
+            self.pipeline.right_retargeter.previous_qpos = self._last_qpos[self.robot_slices[1]].copy()
             return None
         result = self._filter_commands(result)
         if self.backend is not None:
+            if hasattr(self.backend, 'assert_tracking') and self.backend.assert_tracking() is False:
+                self._pause_tracking()
+                return None
             try:
                 self.backend.execute(result.qpos)
             except RuntimeError:
                 if self._duration_expired.is_set():
                     return None
+                if hasattr(self.backend, 'assert_tracking') and self.backend.assert_tracking() is False:
+                    self._pause_tracking()
+                    return None
                 raise
+        self.command_count += 1
         self._last_qpos = result.qpos.copy()
         self.last_command_at = time.monotonic()
         if self.observer is not None:
@@ -187,17 +215,24 @@ class BimanualExecutionFlow:
                     return
                 if self.backend is not None and self.started_at is not None:
                     if now - self.started_at > .5:
-                        self.backend.assert_tracking()
+                        if self.backend.assert_tracking() is False and not self.tracking_paused:
+                            self._pause_tracking()
                     reference = self.last_command_at if self.last_command_at is not None else self.started_at
                     if not self.tracking_paused and now - reference > self.timeout:
                         self._pause_tracking()
                 if now >= next_command:
-                    self.step(self.source.read())
+                    try:
+                        sample = self.source.read()
+                    except StopIteration:
+                        return
+                    self.step(sample)
                     next_command = max(now + self.period, time.monotonic())
                 if now - last_report > 2.:
                     stats = self.source.stats
                     print(f"Quest frames={getattr(stats, 'accepted', 0)} "
-                          f"initialized={self.pipeline.initialized} sequence={self.last_sequence}", flush=True)
+                          f"initialized={self.pipeline.initialized} paused={self.tracking_paused} "
+                          f"sequence={self.last_sequence} commands={self.command_count} "
+                          f"stale={self.stale_count} solve_ms={self.last_solve_ms:.1f}", flush=True)
                     last_report = now
                 time.sleep(.002)
         finally:

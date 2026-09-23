@@ -102,6 +102,8 @@ class Retargeter:
         self.ablation_option = method_config.ablation_option
         self.retarget_wrist_method = "separate" if self.ablation_option in {5, 6, 8} else "joint"
         self.arm_dof = self.retargeting_config.arm_dof
+        if self.arm_dof == 0 and self.retarget_wrist_method == "separate":
+            raise ValueError("Hand-only profiles require joint wrist retargeting (no arm optimizer).")
 
         benchmark_config = robot_config.benchmark
         thumb_fingertip = benchmark_config.thumb_fingertip

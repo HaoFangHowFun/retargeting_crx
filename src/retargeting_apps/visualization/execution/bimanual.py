@@ -81,7 +81,7 @@ class BimanualExecutionVisualizer:
             self.arms, (result.left_qpos, result.right_qpos),
             (result.left_observation, result.right_observation),
         )):
-            self._update_arm(arm, actual[i * 22:(i + 1) * 22], command)
+            self._update_arm(arm, actual[self.flow.robot_slices[i]], command)
             arm[1].update_observation(replace(
                 observation, wrist_pose_world=arm[3] @ observation.wrist_pose_world,
             ))

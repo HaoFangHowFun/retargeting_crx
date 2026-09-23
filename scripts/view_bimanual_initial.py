@@ -1,4 +1,4 @@
-"""Display the CRX+LEAP bimanual initial scene without Quest input."""
+"""Display the configured bimanual initial scene without Quest input."""
 
 from __future__ import annotations
 
@@ -32,7 +32,8 @@ def _load_arm(server, name: str, arm: dict):
         load_meshes=True,
         load_collision_meshes=False,
     )
-    urdf.update_cfg(initial_qpos)
+    by_name = dict(zip(robot.actuated_joints, initial_qpos))
+    urdf.update_cfg({name: by_name[name] for name in urdf.get_actuated_joint_names()})
     model_qpos = adaptor.forward_qpos(initial_qpos)
     model.compute_forward_kinematics(model_qpos)
     placement = arm["placement"]
@@ -40,7 +41,7 @@ def _load_arm(server, name: str, arm: dict):
     if root is not None:
         root.position = tuple(float(value) for value in placement["position"])
         root.wxyz = np.roll(Rotation.from_euler("xyz", placement["rpy"]).as_quat(), 1)
-    for frame_name in ("base_link", "flange", "wrist"):
+    for frame_name in dict.fromkeys(("base_link", "flange", "fanuc_flange", robot.wrist_frame_name)):
         if frame_name not in model.frame_names:
             continue
         pose = placement_pose(arm) @ model.get_frame_pose(frame_name, qpos=model_qpos)
