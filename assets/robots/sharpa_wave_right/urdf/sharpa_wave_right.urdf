@@ -911,7 +911,7 @@
   <joint name="right_retarget_wrist_fixed" type="fixed">
     <parent link="right_hand_wrist" />
     <child link="right_retarget_wrist" />
-    <origin xyz="0 0 0" rpy="0 -1.5707963267948966 0" />
+    <origin xyz="0 0 0" rpy="0 0 0" />
   </joint>
   <joint name="right_sharpa_mount" type="fixed">
     <parent link="world" />

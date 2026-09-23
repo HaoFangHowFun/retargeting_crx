@@ -17,4 +17,4 @@ mount:
   - 0.0
   - 0.0
 mount_calibrated: false
-generated_urdf_sha256: 7c9e248391ef4d14014a65b6ac0d1996bd698b8d475243a5cd22f73d4aa07e93
+generated_urdf_sha256: 5a43f73a555197761696596d7b9148791d1d70c8d9085f66ee870c7ea32f1f69

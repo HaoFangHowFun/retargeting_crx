@@ -8,6 +8,14 @@ physical mounts before controlling real hardware.
 The left CRX mount currently rotates the hand 180 degrees about `fanuc_flange`
 Z; the right mount remains at zero rotation.
 
+The optimization frame `<side>_retarget_wrist` has the same orientation as the
+native Sharpa wrist: +Z follows extended fingers and +X points out of the palm
+(the flexion direction). This matches the current Quest decoder. Its fixed
+joint has zero rotation; it does not add a flange-mount correction. Synthetic
+smoke input uses this same local basis. Regression tests pass an independent
+WebXR skeleton through the Quest decoder and compare mapped finger directions
+and flexion against FK for both hand-only and CRX-mounted models.
+
 From the repository root, inspect the initial scene without Quest or ROS:
 
 ```bash

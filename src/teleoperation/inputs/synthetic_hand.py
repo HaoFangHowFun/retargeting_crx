@@ -31,10 +31,11 @@ class SyntheticBimanualInput:
                 lateral = (.05, .03, .01, -.01, -.03)[finger]
                 for segment in range(4):
                     distance = .025 * (segment + 1)
+                    # Match decoded Quest: +Z along fingers, flexion toward +X.
                     points[1 + 4 * finger + segment] = (
-                        .035 + distance * np.cos(curl * segment),
+                        distance * np.sin(curl * segment),
                         lateral * (1 if side == 'right' else -1),
-                        -distance * np.sin(curl * segment),
+                        .035 + distance * np.cos(curl * segment),
                     )
             hands.append(SensorHandSample(
                 keypoints_wrist=points, wrist_pose_sensor=np.eye(4), timestamp=time.monotonic(),

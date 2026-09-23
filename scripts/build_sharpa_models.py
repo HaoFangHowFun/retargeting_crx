@@ -3,7 +3,6 @@
 import argparse
 import copy
 import hashlib
-import math
 import os
 from pathlib import Path
 import xml.etree.ElementTree as ET
@@ -59,13 +58,14 @@ def build(side, combined, mounts):
     robot.set('name', name)
     for element in hand:
         robot.append(copy.deepcopy(element))
-    # MANO/Quest local +X points along the fingers, native Sharpa +Z does.
-    # A dedicated frame keeps this convention separate from physical mounting.
+    # The current Quest decoder and native Sharpa wrist both use +Z along
+    # extended fingers and +X toward the palm. Keep this frame co-oriented;
+    # physical flange mounting is configured separately below.
     ET.SubElement(robot, 'link', name=f'{side}_retarget_wrist')
     wrist = ET.SubElement(robot, 'joint', name=f'{side}_retarget_wrist_fixed', type='fixed')
     ET.SubElement(wrist, 'parent', link=f'{side}_hand_wrist')
     ET.SubElement(wrist, 'child', link=f'{side}_retarget_wrist')
-    ET.SubElement(wrist, 'origin', xyz='0 0 0', rpy=f'0 {-math.pi / 2} 0')
+    ET.SubElement(wrist, 'origin', xyz='0 0 0', rpy='0 0 0')
     joint = ET.SubElement(robot, 'joint', name=f'{side}_sharpa_mount', type='fixed')
     ET.SubElement(joint, 'parent', link=mount['parent'])
     ET.SubElement(joint, 'child', link=f'{side}_hand_flange')

@@ -6,8 +6,12 @@ import time
 
 import numpy as np
 import pytest
+from scipy.spatial.transform import Rotation
 
 from retargeting_apps.sharpa_teleop import build_flow
+from teleoperation.inputs.quest3 import (
+    HandFrame, HandSample, JointPose, JOINT_NAMES, decode_quest3_sample,
+)
 from teleoperation.inputs.synthetic_hand import SyntheticBimanualInput
 from teleoperation.types import BimanualSensorHandSample
 
@@ -18,6 +22,66 @@ def arguments(**overrides):
                   startup_timeout=3., crx_namespace='crx5ia', sharpa_namespace='sharpa')
     values.update(overrides)
     return NS(**values)
+
+
+def webxr_hand_sample(side, wrist_rotation, curl=0.):
+    """Independent WebXR skeleton: fingers along -Z, flexion toward palm -Y."""
+    rotation = Rotation.from_euler('xyz', wrist_rotation, degrees=True)
+    origin = np.array([.3, 1.2, -.4])
+    positions = {'wrist': np.zeros(3)}
+    segments = ('metacarpal', 'proximal', 'intermediate', 'distal', 'tip')
+    for finger, lateral in zip(('thumb', 'index', 'middle', 'ring', 'little'),
+                               (.05, .03, .01, -.01, -.03)):
+        names = tuple(s for s in segments if finger != 'thumb' or s != 'intermediate')
+        for i, segment in enumerate(names):
+            distance = .025 * (i + 1)
+            positions[f'{finger}_{segment}'] = np.array([
+                -lateral * (1 if side == 'right' else -1),
+                -distance * np.sin(curl), -.035 - distance * np.cos(curl),
+            ])
+    joints = {
+        name: JointPose(tuple(origin + rotation.apply(positions[name])),
+                        tuple(rotation.as_quat()), .008)
+        for name in JOINT_NAMES
+    }
+    frame = HandFrame(sequence=0, source_sequence=0, sender_timestamp_ns=0,
+                      received_monotonic_ns=time.monotonic_ns(), reference_space='local',
+                      hands={side: HandSample(side=side, tracked=True, joints=joints)})
+    return decode_quest3_sample(frame, hand_side=side)
+
+
+@pytest.mark.parametrize('with_arms', [False, True])
+@pytest.mark.parametrize('wrist_rotation', [(0., 0., 0.), (20., -35., 80.)])
+def test_quest_decoded_finger_axes_match_sharpa_fk(with_arms, wrist_rotation):
+    flow, _ = build_flow(arguments(), with_arms=with_arms, source=SyntheticBimanualInput())
+    for side, mapper, joints in zip(('left', 'right'),
+                                    (flow.pipeline.left_mapper, flow.pipeline.right_mapper),
+                                    flow.robot_slices):
+        qpos = flow.initial_qpos[joints].copy()
+        assert mapper.initialize(webxr_hand_sample(side, wrist_rotation), qpos)
+        # Exercise both longitudinal direction and the palm/flexion direction.
+        for curl in (0., .25):
+            observation = mapper.map(webxr_hand_sample(side, wrist_rotation, curl))
+            pose = observation.wrist_pose_world
+            human = observation.keypoints_wrist @ pose[:3, :3].T + pose[:3, 3]
+            robot_qpos = qpos.copy()
+            # The profile owns actuator order; do not assume Pinocchio's order.
+            retargeter = getattr(flow.pipeline, f'{side}_retargeter')
+            for finger in ('index', 'middle', 'ring', 'pinky'):
+                index = list(retargeter.robot_config.actuated_joints).index(f'{side}_{finger}_MCP_FE')
+                robot_qpos[index] = curl
+            model_qpos = mapper.robot_adaptor.forward_qpos(robot_qpos)
+            def position(frame):
+                return mapper.robot_model.get_frame_pose(frame, qpos=model_qpos)[:3, 3]
+            def unit(vector):
+                return vector / np.linalg.norm(vector)
+            for finger, tip in zip(('index', 'middle', 'ring', 'pinky'), (8, 12, 16, 20)):
+                robot_direction = position(f'{side}_{finger}_fingertip') - position(f'{side}_{finger}_DP')
+                np.testing.assert_allclose(unit(human[tip] - human[tip - 1]),
+                                           unit(robot_direction), atol=1e-4)
+            # Check handedness across the palm as well as finger direction.
+            robot_lateral = position(f'{side}_index_MCP_VL') - position(f'{side}_pinky_MCP_VL')
+            assert unit(human[5] - human[17]) @ unit(robot_lateral) > .98
 
 
 @pytest.mark.parametrize('with_arms', [False, True])
