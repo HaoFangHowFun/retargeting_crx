@@ -29,6 +29,6 @@ input:
 
 viewer:
   wait_for_client: false
-  human_keypoint_size: 0.012
+  human_keypoint_size: 0.006
   initial_camera_position: [1.1, 1.1, 0.9]
   initial_camera_look_at: [0.0, 0.0, 0.35]

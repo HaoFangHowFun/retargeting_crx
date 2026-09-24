@@ -39,7 +39,7 @@ class MujocoWebViewerConfig:
     camera_distance: float = -1.0
     camera_azimuth: float = 120.0
     camera_elevation: float = 20.0
-    human_keypoint_size: float = 0.018
+    human_keypoint_size: float = 0.006
     initial_camera_position: tuple[float, float, float] = (1.5, 1.5, 1.2)
     initial_camera_look_at: tuple[float, float, float] = (0.0, 0.0, 0.45)
 
@@ -64,7 +64,7 @@ class MujocoWebViewerConfig:
             camera_distance=float(data.get("camera_distance", -1.0)),
             camera_azimuth=float(data.get("camera_azimuth", 120.0)),
             camera_elevation=float(data.get("camera_elevation", 20.0)),
-            human_keypoint_size=float(data.get("human_keypoint_size", 0.018)),
+            human_keypoint_size=float(data.get("human_keypoint_size", 0.006)),
             initial_camera_position=tuple(
                 float(value) for value in data.get("initial_camera_position", (1.5, 1.5, 1.2))
             ),
@@ -110,7 +110,7 @@ class ViewerConfig:
     port: int = 8080
     no_robot_mesh: bool = False
     trail_length: int = 120
-    human_keypoint_size: float = 0.018
+    human_keypoint_size: float = 0.006
     initial_camera_position: tuple[float, float, float] = (1.5, 1.5, 1.2)
     initial_camera_look_at: tuple[float, float, float] = (0.0, 0.0, 0.45)
 
@@ -130,7 +130,7 @@ class ViewerConfig:
             port=int(data.get("port", 8080)),
             no_robot_mesh=bool(data.get("no_robot_mesh", False)),
             trail_length=int(data.get("trail_length", 120)),
-            human_keypoint_size=float(data.get("human_keypoint_size", 0.018)),
+            human_keypoint_size=float(data.get("human_keypoint_size", 0.006)),
             initial_camera_position=tuple(
                 float(value) for value in data.get("initial_camera_position", (1.5, 1.5, 1.2))
             ),

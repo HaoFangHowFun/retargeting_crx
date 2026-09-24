@@ -39,6 +39,29 @@ to the WebXR receiver on port 8765; the
 viewer remains on port 9219. Both hands must be tracked for calibration.
 Try wrist translation and rotation, each finger, tracking loss, and recovery.
 
+To compare the Quest skeleton with the hand-only Sharpa meshes while tuning
+their input scales, run:
+
+```bash
+env -u PYTHONPATH .venv/bin/python scripts/preview_sharpa_scale.py
+```
+
+Open `http://localhost:9219` and adjust the **Left Quest hand scale** and
+**Right Quest hand scale** sliders. Each starts at its robot config's
+`human_hand_scale` (currently 1.0) and ranges from 0.50 to 2.00. Use
+`--left-scale 1.2 --right-scale 1.1` to start elsewhere. The sliders scale
+Quest wrist-local keypoints on subsequent frames; they do not resize the
+Sharpa URDF. This preview sends no ROS commands. On Ctrl+C, copy the printed
+values to `configs/robots/sharpa_wave_left.yaml` and
+`configs/robots/sharpa_wave_right.yaml` after checking several poses.
+
+Add `--demo` to inspect the same sliders and an animated synthetic skeleton
+without connecting Quest. The synthetic skeleton is for checking the preview
+interface and must not be used to calibrate real tracking scale. Demo mode
+keeps the configured hand-command smoothing. Quest keypoint markers now use a
+0.006 m default diameter in execution and replay viewers, including this scale
+preview. A viewer's `human_keypoint_size` setting can still override it.
+
 For an isolated ROS mock test, source ROS Jazzy and installed copies of both
 driver workspaces in each terminal. Start the Sharpa mock driver in one terminal:
 

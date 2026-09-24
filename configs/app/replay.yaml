@@ -9,7 +9,7 @@ viewer:
   port: 9218
   no_robot_mesh: false
   trail_length: 120
-  human_keypoint_size: 0.005
+  human_keypoint_size: 0.006
   # This is closer than Viser's built-in camera so the robot fills the initial view.
   initial_camera_position: [0.6, 0.6, 0.5]
   initial_camera_look_at: [0.0, 0.0, 0.45]

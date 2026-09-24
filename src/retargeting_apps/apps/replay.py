@@ -53,7 +53,7 @@ def resolve_replay_options_from_config(config: Any) -> dict[str, Any]:
         "port": int(viewer_data.get("port", 8080)),
         "no_robot_mesh": bool(viewer_data.get("no_robot_mesh", False)),
         "trail_length": int(viewer_data.get("trail_length", 120)),
-        "human_keypoint_size": float(viewer_data.get("human_keypoint_size", 0.018)),
+        "human_keypoint_size": float(viewer_data.get("human_keypoint_size", 0.006)),
         "initial_camera_position": _resolve_camera_vector(
             viewer_data, "initial_camera_position", (1.5, 1.5, 1.2)
         ),

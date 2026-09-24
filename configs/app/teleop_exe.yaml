@@ -21,6 +21,6 @@ viewer:
   camera_distance: -1.0
   camera_azimuth: 120.0
   camera_elevation: 20.0
-  human_keypoint_size: 0.005
+  human_keypoint_size: 0.006
   initial_camera_position: [0.6, 0.6, 0.5]
   initial_camera_look_at: [0.0, 0.0, 0.45]

@@ -345,7 +345,7 @@ def test_offline_retarget_post_actions_reuse_standalone_app_defaults():
         "port": 9218,
         "no_robot_mesh": False,
         "trail_length": 120,
-        "human_keypoint_size": 0.005,
+        "human_keypoint_size": 0.006,
         "initial_camera_position": [0.6, 0.6, 0.5],
         "initial_camera_look_at": [0.0, 0.0, 0.45],
     }
@@ -363,7 +363,7 @@ def test_replay_app_config_loads_defaults():
     assert "detection_source" not in config
     assert isinstance(config["viewer"]["port"], int)
     assert config["viewer"]["port"] > 0
-    assert config["viewer"]["human_keypoint_size"] == 0.005
+    assert config["viewer"]["human_keypoint_size"] == 0.006
     assert config["viewer"]["initial_camera_position"] == [0.6, 0.6, 0.5]
     assert config["viewer"]["initial_camera_look_at"] == [0.0, 0.0, 0.45]
 
@@ -422,7 +422,7 @@ def test_base_config_selects_each_whitelisted_app():
     assert teleop_offline_mujoco_config["viewer"]["type"] == "auto"
     assert teleop_offline_mujoco_config["viewer"]["port"] == 9219
     assert teleop_offline_mujoco_config["viewer"]["wait_for_client"] is True
-    assert teleop_offline_mujoco_config["viewer"]["human_keypoint_size"] == 0.005
+    assert teleop_offline_mujoco_config["viewer"]["human_keypoint_size"] == 0.006
 
 
 def test_main_dispatcher_rejects_unknown_app_id():
