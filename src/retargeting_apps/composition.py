@@ -385,10 +385,12 @@ def build_bimanual_execution_flow(config: dict[str, Any], *, source=None) -> Bim
             )
 
     output = setup.get("output", {})
-    if backend.name == "dual_crx" or output.get("limit_joint_speed", False):
+    if (backend.name == "dual_crx" or output.get("limit_joint_speed", False)
+            or output.get("smooth_output_qpos", False)):
         def filters(arm: bool, key: str):
             filter_mode = replace(mode, output=replace(
                 mode.output, smoothing_alpha=float(output.get(key, mode.output.smoothing_alpha)),
+                smooth_output_qpos=bool(output.get("smooth_output_qpos", mode.output.smooth_output_qpos)),
             ))
             return tuple(QposOutputFilter(r.qpos_init[:r.arm_dof] if arm else r.qpos_init[r.arm_dof:],
                                           filter_mode) for r in retargeters)

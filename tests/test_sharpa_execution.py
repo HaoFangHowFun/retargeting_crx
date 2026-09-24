@@ -85,22 +85,37 @@ def test_quest_decoded_finger_axes_match_sharpa_fk(with_arms, wrist_rotation):
 
 
 @pytest.mark.parametrize('with_arms', [False, True])
-def test_real_solver_shapes_limits_fifth_finger_and_finite_input(with_arms):
+def test_real_solver_smoothing_without_speed_cap_and_finite_input(with_arms, monkeypatch):
     source = SyntheticBimanualInput(frames=4, max_age_s=10.)
     flow, _ = build_flow(arguments(), with_arms=with_arms, source=source)
     source.open()
+    assert flow.command_limiters is None
+    assert flow.arm_output_filters is not None and flow.hand_output_filters is not None
     previous = flow.initial_qpos.copy()
+    raw_results = []
+    original_step = flow.pipeline.step
+
+    def record_raw(sample):
+        result = original_step(sample)
+        raw_results.append(result.qpos.copy())
+        return result
+
+    monkeypatch.setattr(flow.pipeline, 'step', record_raw)
     assert flow.robot_dofs == ((28, 28) if with_arms else (22, 22))
     for _ in range(4):
         result = flow.step(source.read())
         assert result is not None and np.isfinite(result.qpos).all()
         for i, r in enumerate((flow.pipeline.left_retargeter, flow.pipeline.right_retargeter)):
+            assert r.optimizer.opt._opt.get_maxtime() == pytest.approx(.025)
             assert r.human_fingertip_indices.tolist() == [4, 8, 12, 16, 20]
             joints = flow.robot_slices[i]
             qpos = result.qpos[joints]
+            alpha = np.full(flow.robot_dofs[i], .3)
+            alpha[:flow.arm_dofs[i]] = .5
+            expected = alpha * raw_results[-1][joints] + (1. - alpha) * previous[joints]
+            np.testing.assert_allclose(qpos, expected, atol=1e-12)
             assert np.all(qpos >= r.optimizer.joint_limits[:, 0] - 1e-7)
             assert np.all(qpos <= r.optimizer.joint_limits[:, 1] + 1e-7)
-            assert np.all(np.abs(qpos - previous[joints]) <= flow.command_limiters[i].max_delta + 1e-7)
             np.testing.assert_allclose(r.previous_qpos, qpos)
         previous = result.qpos.copy()
     assert flow.command_count == 4
@@ -144,12 +159,23 @@ def test_measured_56_dim_seed_pause_and_recovery(monkeypatch):
     measured = flow.initial_qpos.copy()
     measured[[0, 28]] += .01
     calls = []
+    seeds = []
+    original_step = flow.pipeline.step
+
+    def record_seed(sample):
+        seeds.append(np.concatenate((flow.pipeline.left_retargeter.previous_qpos,
+                                     flow.pipeline.right_retargeter.previous_qpos)))
+        return original_step(sample)
+
+    monkeypatch.setattr(flow.pipeline, 'step', record_seed)
     backend = NS(get_joint_pos=lambda: measured.copy(), execute=lambda q: calls.append(q.copy()),
                  pause_tracking=lambda: None, resume_tracking=lambda: False)
     flow.backend_factory = lambda: backend
     assert flow.step(source.read()) is None
-    flow.step(source.read())
+    result = flow.step(source.read())
     assert len(calls) == 1
+    np.testing.assert_array_equal(calls[-1], result.qpos)
+    np.testing.assert_array_equal(seeds[0], measured)
     backend.assert_tracking = lambda: False
     assert flow.step(source.read()) is None
     assert flow.tracking_paused and len(calls) == 1
@@ -164,9 +190,10 @@ def test_measured_56_dim_seed_pause_and_recovery(monkeypatch):
     flow._recovery_started = time.monotonic() - 1
     flow.step(source.read())
     assert not flow.tracking_paused and not flow.pipeline.initialized
-    flow.step(source.read())
+    result = flow.step(source.read())
     assert len(calls) == 2
-    assert np.max(np.abs(calls[-1] - measured)) <= .05 + 1e-7
+    np.testing.assert_array_equal(seeds[-1], measured)
+    np.testing.assert_array_equal(calls[-1], result.qpos)
 
 
 def test_cli_help_never_opens_devices():

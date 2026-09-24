@@ -73,8 +73,15 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 SHARPA_ROS_TEST=1 .venv/bin/python -m pytest te
 ```
 
 For live Quest input with mock drivers, omit `--synthetic-frames`;
-`--duration 60` sets a finite session. The solver has a 25 ms budget per hand. A slow solve
-can cause a frame to be dropped, and a missing feedback stream pauses output
+`--duration 60` sets a finite session. Each side has its own solver, executed
+sequentially, with a 25 ms time budget per side (approximately 50 ms combined,
+plus processing overhead). A solve that exceeds the input freshness threshold
+(150 ms by default) can still cause a frame to be dropped. The Sharpa defaults
+apply output smoothing (arm alpha 0.5, hand alpha 0.3) in preview and ROS modes,
+without retargeting-side joint speed limiting. Smoothing is enabled independently
+with `output.smooth_output_qpos`; `output.limit_joint_speed` defaults to false.
+The downstream controller owns velocity limiting. Model joint-position bounds still apply.
+A missing feedback stream pauses output
 until fresh feedback and a new calibration are available. The target rate is
 20 Hz; the actual rate and solve time are reported during execution. Mock
 results verify the software path only. Physical control requires confirmed

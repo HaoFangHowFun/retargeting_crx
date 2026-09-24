@@ -20,11 +20,8 @@ def build_flow(args, *, with_arms, source=None):
     if args.config:
         config['bimanual'].update(load_config_source(args.config))
     config['bimanual']['duration'] = args.duration
-    # Two 22/28-DOF solves share one 20 Hz command period. Keep an expensive
-    # frame from aging out before either hand can publish a fresh target.
+    # Two sequential solves share an approximately 50 ms budget (25 ms per side).
     config['solver']['params']['maxtime'] = 0.025
-    # Sharpa output always uses continuous limits, also in preview.
-    config['bimanual'].setdefault('output', {})['limit_joint_speed'] = True
     config['backend']['command_hz'] = args.command_hz
     config['input'].update(adb=args.adb, serial=args.serial)
     config['viewer'].update(enabled=args.viewer, port=args.viewer_port, wait_for_client=False)

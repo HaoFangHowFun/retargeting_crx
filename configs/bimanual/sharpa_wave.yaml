@@ -32,6 +32,7 @@ input:
   port: 8765
   max_age_s: 0.15
 output:
+  smooth_output_qpos: true
   arm_smoothing_alpha: 0.5
   hand_smoothing_alpha: 0.3
-  limit_joint_speed: true
+  limit_joint_speed: false
