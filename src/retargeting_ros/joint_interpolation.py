@@ -1,4 +1,4 @@
-"""ROS-independent, time-sampled interpolation of twelve CRX joint commands.
+"""ROS-independent, time-sampled interpolation of joint commands.
 
 Natural cubic follows RobotRealHighFreq's published-history approach. It does
 not impose joint, velocity or acceleration limits and may overshoot.
@@ -9,27 +9,30 @@ import numpy as np
 from scipy.interpolate import CubicSpline
 
 
-def joint_vector(values):
+def joint_vector(values, num_joints=12):
     q = np.asarray(values, dtype=float)
-    if q.shape != (12,) or not np.isfinite(q).all():
-        raise ValueError('Expected 12 finite joint positions')
+    if q.shape != (num_joints,) or not np.isfinite(q).all():
+        raise ValueError(f'Expected {num_joints} finite joint positions')
     return q.copy()
 
 
 class JointCommandInterpolator:
     """Build on the last published sample; evaluate using monotonic time."""
 
-    def __init__(self, initial, method='cubic'):
+    def __init__(self, initial, method='cubic', *, num_joints=12):
         if method not in ('linear', 'cubic'):
             raise ValueError('Interpolation method must be linear or cubic')
+        if isinstance(num_joints, bool) or not isinstance(num_joints, int) or num_joints <= 0:
+            raise ValueError('num_joints must be a positive integer')
         self.method = method
-        self.last_q = joint_vector(initial)
+        self.num_joints = num_joints
+        self.last_q = joint_vector(initial, num_joints)
         self.last_time = None
         self.history = deque(maxlen=5)
         self.segment = None
 
     def set_target(self, target, received_at, horizon, now):
-        q = joint_vector(target)
+        q = joint_vector(target, self.num_joints)
         if not np.isfinite([received_at, horizon, now]).all() or horizon <= 0 or now < received_at:
             raise ValueError('Invalid interpolation times or horizon')
         start = now if self.last_time is None else self.last_time
@@ -57,12 +60,12 @@ class JointCommandInterpolator:
         if now <= start:
             return initial.copy()
         if spline is not None:
-            return joint_vector(spline(now - start))
+            return joint_vector(spline(now - start), self.num_joints)
         phase = (now - start) / (end - start)
-        return joint_vector(initial + phase * (target - initial))
+        return joint_vector(initial + phase * (target - initial), self.num_joints)
 
     def record_published(self, now, q):
-        values = joint_vector(q)
+        values = joint_vector(q, self.num_joints)
         if not np.isfinite(now) or (self.last_time is not None and now < self.last_time):
             raise ValueError('Publish time must be finite and monotonic')
         if self.last_time == now and self.history:

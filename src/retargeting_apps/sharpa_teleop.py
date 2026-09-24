@@ -36,11 +36,19 @@ def build_flow(args, *, with_arms, source=None):
     if args.backend == 'ros':
         from retargeting_ros.sharpa_joint import SharpaJointBackend
 
+        publish_hz = getattr(args, 'publish_hz', 100.)
+        horizon_ms = getattr(args, 'interpolation_horizon_ms', None)
+        horizon = flow.period if horizon_ms is None else horizon_ms / 1000.
+        if not math.isfinite(publish_hz) or publish_hz <= 0:
+            raise ValueError('publish_hz must be finite and positive')
+        if not math.isfinite(horizon) or not 0 < horizon < flow.timeout:
+            raise ValueError('Interpolation horizon must be positive and shorter than the target timeout')
         limits = np.concatenate([r.optimizer.joint_limits for r in retargeters])
         flow.backend_factory = lambda: SharpaJointBackend(
             robot_names=names, initial_qpos=flow.initial_qpos,
             lower=limits[:, 0], upper=limits[:, 1], control_period=flow.period,
             startup_timeout=args.startup_timeout, target_timeout=flow.timeout,
+            publish_hz=publish_hz, interpolation_horizon=horizon,
             crx_namespace=args.crx_namespace, sharpa_namespace=args.sharpa_namespace,
         )
     return flow, config
@@ -56,6 +64,10 @@ def main(argv=None, *, with_arms=True):
     parser.add_argument('--viewer', action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument('--viewer-port', type=int, default=9219)
     parser.add_argument('--command-hz', type=float, default=20.)
+    parser.add_argument('--publish-hz', type=float, default=100.,
+                        help='ROS linear-interpolation publication rate; independent of solving (default: 100)')
+    parser.add_argument('--interpolation-horizon-ms', type=float, default=None,
+                        help='ROS interpolation duration; defaults to 1000 / command-hz, normally 50 ms')
     parser.add_argument('--duration', type=float, default=0., help='Seconds after initialization; 0 is unlimited')
     parser.add_argument('--startup-timeout', type=float, default=5.)
     parser.add_argument('--crx-namespace', default='crx5ia')
@@ -63,9 +75,12 @@ def main(argv=None, *, with_arms=True):
     parser.add_argument('--synthetic-frames', type=int, default=None,
                         help='Explicit finite smoke input instead of opening Quest (use ROS mock only)')
     args = parser.parse_args(argv)
-    for name in ('command_hz', 'startup_timeout'):
+    for name in ('command_hz', 'startup_timeout', 'publish_hz'):
         if not math.isfinite(getattr(args, name)) or getattr(args, name) <= 0:
             parser.error(f'{name} must be finite and positive')
+    if args.interpolation_horizon_ms is not None and (
+            not math.isfinite(args.interpolation_horizon_ms) or args.interpolation_horizon_ms <= 0):
+        parser.error('interpolation-horizon-ms must be finite and positive')
     if not math.isfinite(args.duration) or args.duration < 0:
         parser.error('duration must be finite and nonnegative')
     if not 1 <= args.viewer_port <= 65535:

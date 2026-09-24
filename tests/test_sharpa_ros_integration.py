@@ -30,15 +30,16 @@ def test_mock_drivers_receive_solver_commands_and_cleanup(with_arms, monkeypatch
     monkeypatch.setenv('ROS_STATIC_PEERS', '')
     monkeypatch.setenv('ROS_LOG_DIR', str(tmp_path / 'logs'))
     args = NS(config=None, backend='ros', duration=0., command_hz=20., adb=None, serial=None,
+              publish_hz=100., interpolation_horizon_ms=50.,
               viewer=False, viewer_port=9219, startup_timeout=30.,
               crx_namespace='crx5ia', sharpa_namespace='sharpa')
     source = SyntheticBimanualInput(100)
     flow, _ = build_flow(args, with_arms=with_arms, source=source)
     launches = [['ros2', 'launch', 'dual_sharpa_wave', 'dual_sharpa.launch.py',
-                 'backend:=mock', 'use_rviz:=false']]
+                 'backend:=mock', 'use_rviz:=false', 'publish_rate_hz:=100.0']]
     if with_arms:
         launches.append(['ros2', 'launch', 'dual_crx_control', 'dual_arm.launch.py',
-                         'mock:=true', 'rviz:=false', 'method:=linear', 'input_rate_hz:=20.0'])
+                         'mock:=true', 'rviz:=false', 'method:=linear', 'input_rate_hz:=100.0'])
     processes, logs = [], []
     context = Context()
     rclpy.init(args=[], context=context)
@@ -78,6 +79,17 @@ def test_mock_drivers_receive_solver_commands_and_cleanup(with_arms, monkeypatch
         assert np.max(np.abs(target - measured)) < .2
         for topic, messages in received.items():
             assert all(len(msg.name) == (12 if 'crx5ia' in topic else 22) for msg in messages)
+            stamps = np.asarray([msg.header.stamp.sec + msg.header.stamp.nanosec / 1e9
+                                 for msg in messages])
+            rate = (len(stamps) - 1) / (stamps[-1] - stamps[0])
+            print(f'{topic}: {rate:.1f} Hz, {len(messages)} publications, '
+                  f'{flow.command_count} solver targets', flush=True)
+            assert 80. <= rate <= 120., (topic, rate)
+            assert len(messages) > 2 * flow.command_count
+        # Every publication uses one common timestamp for all required channels.
+        stamp_sets = [{(msg.header.stamp.sec, msg.header.stamp.nanosec) for msg in values}
+                      for values in received.values()]
+        assert len(set.intersection(*stamp_sets)) >= .9 * min(map(len, stamp_sets))
         flow.backend.pause_tracking()
         time.sleep(.1)
         counts = {topic: len(values) for topic, values in received.items()}

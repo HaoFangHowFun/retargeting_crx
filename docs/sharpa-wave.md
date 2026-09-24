@@ -52,7 +52,7 @@ To test arms and hands together, also start the CRX mock driver in another
 terminal using the same domain:
 
 ```bash
-ros2 launch dual_crx_control dual_arm.launch.py mock:=true rviz:=false method:=linear input_rate_hz:=20.0
+ros2 launch dual_crx_control dual_arm.launch.py mock:=true rviz:=false method:=linear input_rate_hz:=100.0
 ```
 
 Then run one of these finite synthetic-input smoke tests from this repository,
@@ -66,6 +66,42 @@ with the same sourced ROS environment and domain:
 Run the two commands separately. The first requires only Sharpa feedback; the
 second requires Sharpa and CRX feedback. The scripts wait for complete, fresh
 joint states and subscribers before publishing. They stop on input exhaustion.
+
+Both Sharpa scripts default to **100 Hz linear-interpolated ROS output**, while
+retargeting still targets 20 Hz. To state these settings explicitly for live
+Quest input after starting the mock drivers:
+
+```bash
+.venv/bin/python scripts/run_crx_sharpa_joint_teleop.py --backend ros --command-hz 20 --publish-hz 100 --interpolation-horizon-ms 50
+```
+
+For hands only, use `scripts/run_sharpa_joint_teleop.py` with the same options.
+`--publish-hz` and `--interpolation-horizon-ms` affect ROS output only; preview
+continues to show each solved, smoothed target. The default interpolation horizon
+is `1000 / command-hz` ms and must be shorter than the 250 ms target timeout.
+Smoothing runs once per solver target, not once per 100 Hz publication.
+
+An independent steady-clock ROS timer samples the complete 44- or 56-joint
+vector, then publishes the hand channels and optional arm channel with the same
+timestamp. Separate topics are not an atomic transport. New solver targets
+replace pending targets; missed timer slots are not replayed in bursts. The
+last endpoint is held between fresh targets, but repeated publications do not
+extend the lifetime of an old solver target. Tracking loss, stale feedback,
+expired targets, and shutdown cancel interpolation. Recovery starts from fresh
+measured joint positions.
+
+Sharpa's driver `publish_rate_hz: 100.0` controls its feedback/update timer;
+commands are consumed on receipt. Its SDK interpolation setting remains owned
+by that driver. CRX uses `input_rate_hz:=100.0` for this incoming stream and keeps
+its own downstream output frequency. No controller configuration is changed by
+the retargeting scripts. To measure each command topic during a mock run:
+
+```bash
+ros2 topic hz /sharpa/left_hand/joint_command
+ros2 topic hz /sharpa/right_hand/joint_command
+ros2 topic hz /crx5ia/joint_targets
+```
+
 To run the opt-in automated mock test:
 
 ```bash
@@ -82,7 +118,10 @@ without retargeting-side joint speed limiting. Smoothing is enabled independentl
 with `output.smooth_output_qpos`; `output.limit_joint_speed` defaults to false.
 The downstream controller owns velocity limiting. Model joint-position bounds still apply.
 A missing feedback stream pauses output
-until fresh feedback and a new calibration are available. The target rate is
-20 Hz; the actual rate and solve time are reported during execution. Mock
+until fresh feedback and a new calibration are available. The solver target rate
+is 20 Hz and the ROS publication target is 100 Hz. The flow's `commands` counter
+counts solver targets, not interpolated ROS publications. Actual solver rate and
+solve time are reported during execution; topic frequency must be measured under
+solver and viewer load. Mock
 results verify the software path only. Physical control requires confirmed
 mounts, joint mapping, safety setup, and a separate device test.

@@ -13,6 +13,7 @@ from teleoperation.backends.sharpa_contract import joint_channels, named_positio
 class SharpaJointBackend:
     def __init__(self, *, robot_names, initial_qpos, lower, upper, control_period,
                  startup_timeout=5., feedback_timeout=.5, target_timeout=.25,
+                 publish_hz=None, interpolation_horizon=None,
                  crx_namespace='crx5ia', sharpa_namespace='sharpa'):
         self.channels = joint_channels(robot_names)
         self._size = sum(map(len, robot_names))
@@ -23,10 +24,21 @@ class SharpaJointBackend:
             raise ValueError('Expected finite model bounds for every joint')
         self._actual = self._validate_command(initial_qpos)
         self._target = self._actual.copy()
-        for value in (control_period, startup_timeout, feedback_timeout, target_timeout):
+        horizon = control_period if interpolation_horizon is None else interpolation_horizon
+        for value in (control_period, startup_timeout, feedback_timeout, target_timeout, horizon):
             if not math.isfinite(value) or value <= 0:
                 raise ValueError('Periods and timeouts must be finite and positive')
+        if publish_hz is not None:
+            if not math.isfinite(publish_hz) or publish_hz <= 0:
+                raise ValueError('publish_hz must be finite and positive')
+            if horizon >= target_timeout:
+                raise ValueError('Interpolation horizon must be shorter than the target timeout')
         self.control_period = control_period
+        self._publish_hz, self._horizon = publish_hz, horizon
+        self._output_timer = self._interpolator = self._pending_target = None
+        self._last_published = self._actual.copy()
+        self._output_generation = 0
+        self._target_count = self._publish_count = self._rejected_samples = 0
         self._feedback_timeout, self._target_timeout = feedback_timeout, target_timeout
         self._lock = threading.RLock()
         self._closed = self._stopped = self._paused = False
@@ -72,6 +84,7 @@ class SharpaJointBackend:
                     with self._lock:
                         self._check_feedback()
                         self._target = self._validate_command(self._actual)
+                        self._reset_output_locked(self._actual)
                     break
                 except RuntimeError as exc:
                     if time.monotonic() >= deadline:
@@ -79,6 +92,13 @@ class SharpaJointBackend:
                     time.sleep(.01)
             self._watchdog = self._node.create_timer(
                 .02, self._watchdog_tick, clock=Clock(clock_type=ClockType.STEADY_TIME))
+            if self._publish_hz is not None:
+                self._output_timer = self._node.create_timer(
+                    1. / self._publish_hz, self._publish_tick,
+                    clock=Clock(clock_type=ClockType.STEADY_TIME), autostart=False)
+            self._node.get_logger().info(
+                'Sharpa output: ' + ('direct solver targets' if publish_hz is None else
+                f'{publish_hz:g} Hz linear interpolation; horizon {horizon * 1000:g} ms'))
         except BaseException:
             self.close()
             raise
@@ -98,6 +118,73 @@ class SharpaJointBackend:
             with self._lock:
                 self._spin_error = str(exc)
                 self._stopped = True
+                self._reset_output_locked(self._last_published)
+
+    def _reset_output_locked(self, seed):
+        """Cancel publication and invalidate work computed outside the lock."""
+        self._output_generation += 1
+        self._pending_target = self._last_command_at = None
+        self._last_published = np.asarray(seed, dtype=float).copy()
+        if self._output_timer is not None:
+            self._output_timer.cancel()
+        if self._publish_hz is not None:
+            from retargeting_ros.joint_interpolation import JointCommandInterpolator
+
+            self._interpolator = JointCommandInterpolator(seed, 'linear', num_joints=self._size)
+
+    def _publish_tick(self):
+        """Sample all joints at one time; publish each channel once per tick."""
+        with self._lock:
+            if (self._closed or self._stopped or self._paused
+                    or self._last_command_at is None or self._publish_hz is None):
+                return
+            try:
+                self._check_feedback()
+                now = time.monotonic()
+                if now - self._last_command_at > self._target_timeout:
+                    raise RuntimeError('No fresh retargeting target')
+            except RuntimeError as exc:
+                self._pause_locked()
+                self._node.get_logger().warning(str(exc))
+                return
+            pending, self._pending_target = self._pending_target, None
+            interpolator, generation = self._interpolator, self._output_generation
+
+        # Use the same interpolation helper as CRX. Do not hold up feedback or stop.
+        try:
+            if pending is not None:
+                target, received_at = pending
+                interpolator.set_target(target, received_at, self._horizon, now)
+            values = interpolator.sample(now)
+            self._validate_command(values)
+        except (ValueError, FloatingPointError) as exc:
+            with self._lock:
+                if generation != self._output_generation:
+                    return
+                self._rejected_samples += 1
+                self._pause_locked()
+            self._node.get_logger().warning(f'Sharpa interpolation rejected: {exc}')
+            return
+
+        with self._lock:
+            if (generation != self._output_generation or self._closed
+                    or self._stopped or self._paused):
+                return
+            try:
+                self._check_feedback()
+                published_at = time.monotonic()
+                if (published_at - self._last_command_at > self._target_timeout
+                        or published_at - now >= 1. / self._publish_hz):
+                    self._rejected_samples += 1
+                    raise RuntimeError('Sharpa interpolation sample missed its deadline')
+            except RuntimeError as exc:
+                self._pause_locked()
+                self._node.get_logger().warning(str(exc))
+                return
+            self._publish(values)
+            interpolator.record_published(published_at, values)
+            self._last_published = values.copy()
+            self._publish_count += 1
 
     def _receive_state(self, key, message):
         with self._lock:
@@ -168,16 +255,27 @@ class SharpaJointBackend:
             self._check_feedback()
             if self._paused:
                 raise RuntimeError('Output paused; recalibrate before resuming')
-            self._publish(values)
+            received_at = time.monotonic()
+            if self._publish_hz is None:
+                self._publish(values)
+                self._last_published = values.copy()
+                self._publish_count += 1
+            else:
+                self._pending_target = (values.copy(), received_at)
+                if self._output_timer.is_canceled():
+                    self._output_timer.reset()
             self._target = values
-            self._last_command_at = time.monotonic()
-            return BackendStepResult(command_qpos=values, actual_qpos=self._actual.copy(), diagnostics={})
+            self._last_command_at = received_at
+            self._target_count += 1
+            return BackendStepResult(command_qpos=values, actual_qpos=self._actual.copy(),
+                                     diagnostics={'targets': self._target_count,
+                                                  'publications': self._publish_count})
 
     def _pause_locked(self):
         if self._paused:
             return
         self._paused = True
-        self._last_command_at = None
+        self._reset_output_locked(self._actual)
         try:
             self._check_feedback()
             self._publish(self._actual)  # One measured hold target, never a repeated stale goal.
@@ -209,8 +307,8 @@ class SharpaJointBackend:
             except (RuntimeError, ValueError):
                 return False
             self._target = self._actual.copy()
+            self._reset_output_locked(self._actual)
             self._paused = False
-            self._last_command_at = None
             return True
 
     def assert_tracking(self):

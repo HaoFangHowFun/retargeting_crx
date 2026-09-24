@@ -6,6 +6,47 @@
 virtual preview.** Run the commands below from the repository root in WSL/Linux.
 Complete [Install and Test](#install-and-test) first if `.venv` is not ready.
 
+### Choose a ROS control mode (100 Hz)
+
+All three entrypoints are listed below. Source ROS and the relevant workspaces,
+use the same ROS domain as the drivers, and start the mock drivers first:
+[CRX arms setup](#joint-only-output-to-ws_fanucdual_crx_control) or
+[Sharpa hands / arms + hands setup](docs/sharpa-wave.md).
+Connect Quest as described below, then run **one** of these commands.
+
+**Dual CRX arms only (12 joints):**
+
+```bash
+.venv/bin/python scripts/run_crx_joint_teleop.py \
+  --namespace crx5ia --command-hz 20 --publish-hz 100 \
+  --output-interpolation cubic --interpolation-horizon-ms 50
+```
+
+**Dual Sharpa hands only (44 joints):**
+
+```bash
+.venv/bin/python scripts/run_sharpa_joint_teleop.py \
+  --backend ros --command-hz 20 --publish-hz 100 --interpolation-horizon-ms 50
+```
+
+**Dual CRX arms + dual Sharpa hands (56 joints):**
+
+```bash
+.venv/bin/python scripts/run_crx_sharpa_joint_teleop.py \
+  --backend ros --command-hz 20 --publish-hz 100 --interpolation-horizon-ms 50
+```
+
+These commands request 20 Hz solving and independent 100 Hz ROS publication,
+with a 50 ms interpolation horizon. The arms-only command uses cubic
+interpolation; both Sharpa entrypoints use linear interpolation by default.
+Configure the CRX driver with `input_rate_hz:=100.0`; Sharpa uses its 100 Hz
+driver update rate. Existing output smoothing is retained. The Sharpa modes
+keep arm smoothing at 0.5, hand smoothing at 0.3, and joint speed limiting disabled.
+
+For a virtual Sharpa preview, follow the steps below. Preview updates at the
+solver rate; the 100 Hz publisher runs in ROS mode. See the
+[Sharpa Wave guide](docs/sharpa-wave.md) for topic-frequency checks and configuration.
+
 ### 1. Connect Quest 3
 
 Enable developer mode and hand tracking on the headset, connect it by USB, and
@@ -59,9 +100,6 @@ Both live preview commands also accept:
 | `--serial <adb-serial>` | Select a headset when multiple ADB devices are attached. |
 | `--viewer-port 9220` | Open the viewer on a different port. |
 | `--no-viewer` | Run without the desktop viewer. |
-
-See the [Sharpa Wave guide](docs/sharpa-wave.md) for ROS mock operation,
-configuration paths, and model coordinate conventions.
 
 ## Project Overview
 

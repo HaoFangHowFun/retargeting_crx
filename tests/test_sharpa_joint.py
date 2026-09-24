@@ -26,6 +26,11 @@ def backend():
     b._lock = threading.RLock()
     b._closed = b._stopped = b._paused = False
     b._spin_error = b._last_command_at = None
+    b._publish_hz, b._horizon = None, .05
+    b._output_timer = b._interpolator = b._pending_target = None
+    b._last_published = b._actual.copy()
+    b._output_generation = 0
+    b._target_count = b._publish_count = b._rejected_samples = 0
     b._feedback_timeout, b._target_timeout = .5, .25
     b._feedback = {key: dict(stamp=0, received=0., advanced=0., error='waiting') for key in b.channels}
     b.sent = {key: [] for key in b.channels}

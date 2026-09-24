@@ -19,6 +19,7 @@ from teleoperation.types import BimanualSensorHandSample
 def arguments(**overrides):
     values = dict(config=None, backend='preview', duration=0., command_hz=20.,
                   adb=None, serial=None, viewer=False, viewer_port=9219,
+                  publish_hz=100., interpolation_horizon_ms=None,
                   startup_timeout=3., crx_namespace='crx5ia', sharpa_namespace='sharpa')
     values.update(overrides)
     return NS(**values)
@@ -203,3 +204,26 @@ def test_cli_help_never_opens_devices():
         result = subprocess.run([sys.executable, f'scripts/{script}', '--help'], capture_output=True, text=True)
         assert result.returncode == 0, result.stderr
         assert '--backend' in result.stdout and '--synthetic-frames' in result.stdout
+        assert '--publish-hz' in result.stdout and '--interpolation-horizon-ms' in result.stdout
+
+
+@pytest.mark.parametrize('with_arms', [False, True])
+def test_ros_composition_uses_100hz_independently_of_solver_rate(with_arms, monkeypatch):
+    from retargeting_ros import sharpa_joint
+
+    monkeypatch.setattr(sharpa_joint, 'SharpaJointBackend', lambda **kwargs: NS(**kwargs))
+    flow, _ = build_flow(arguments(backend='ros'), with_arms=with_arms,
+                         source=SyntheticBimanualInput())
+    backend = flow.backend_factory()
+    assert backend.publish_hz == 100.
+    assert backend.control_period == backend.interpolation_horizon == .05
+    assert len(backend.initial_qpos) == (56 if with_arms else 44)
+
+
+@pytest.mark.parametrize('overrides', [dict(publish_hz=0.), dict(publish_hz=float('nan')),
+                                      dict(interpolation_horizon_ms=250.),
+                                      dict(interpolation_horizon_ms=float('inf'))])
+def test_ros_invalid_publication_settings_rejected_before_open(overrides):
+    with pytest.raises(ValueError):
+        build_flow(arguments(backend='ros', **overrides), with_arms=True,
+                   source=SyntheticBimanualInput())
