@@ -10,9 +10,9 @@
 
   更正：這條指令和前述 CRX 手臂指令不同。我先前判斷「目前仍用 LEAP 手模型」是錯的。`scripts/run_sharpa_joint_teleop.py` 透過 `sharpa_teleop` 載入 `configs/bimanual/sharpa_wave.yaml`，左右各用 Sharpa Wave 的 URDF、22 關節與五指 profile。目前只能確認程式使用哪套模型，無法從程式碼單獨證明實體 Sharpa 尺寸、Quest 追蹤點或兩者之間哪個有誤差。`--publish-hz` 和 `--interpolation-horizon-ms` 只調整 ROS 輸出的時間取樣，不影響幾何。
 
-  **可以調的縮放比例：`human_hand_scale`。Sharpa 左、右手目前都是 `1.0`；LEAP 設定是 `1.5`，但這條 Sharpa 指令不會使用 LEAP 的值。** 修改位置分別是 `configs/robots/sharpa_wave_left.yaml` 與 `configs/robots/sharpa_wave_right.yaml` 的 `human_hand_scale`。它會把 Quest 的手腕局部 keypoint 座標乘上該比例，再送進求解器；例如 `1.1` 代表追蹤骨架的手腕到指尖向量放大 10%。它**不會改變 Sharpa URDF 或實體手尺寸**，左右手也可分開校正。先量出誤差方向與比例，再調整這個值，避免只憑畫面猜數字。
+  **可以調的縮放比例：`human_hand_scale`。Sharpa 左、右手原先都是 `1.0`，現在依 Quest 比對結果改為 `1.2`；LEAP 設定是 `1.5`，但這條 Sharpa 指令不會使用 LEAP 的值。** 雙手專用設定分別在 `configs/robots/sharpa_wave_left.yaml` 與 `configs/robots/sharpa_wave_right.yaml`；CRX+Sharpa 模式另用 `configs/robots/crx5ia_sharpa_wave_left.yaml` 與 `configs/robots/crx5ia_sharpa_wave_right.yaml`。它會把 Quest 的手腕局部 keypoint 座標乘上該比例，再送進求解器。它**不會改變 Sharpa URDF 或實體手尺寸**，左右手也可分開校正。
 
-  **即時比對 preview：**執行 `env -u PYTHONPATH .venv/bin/python scripts/preview_sharpa_scale.py`，在瀏覽器開啟 `http://localhost:9219`，用 **Left Quest hand scale** 和 **Right Quest hand scale** 滑桿邊看 Quest 骨架與 Sharpa 網格邊調整。滑桿範圍 `0.50–2.00`，預設讀取目前左右 Sharpa 設定（現在各為 `1.0`）；也可用 `--left-scale 1.2 --right-scale 1.1` 指定起始值。這個 preview 不連 ROS，也不送實體手命令。按 Ctrl+C 後終端會印出最終數值；確認多個手勢都合適後，再將其填回上述左右設定檔。若畫面中只有單一指節不合，應檢查關節與追蹤點對應，不要只靠整體比例修正。
+  **即時比對 preview：**執行 `env -u PYTHONPATH .venv/bin/python scripts/preview_sharpa_scale.py`，在瀏覽器開啟 `http://localhost:9219`，用 **Left Quest hand scale** 和 **Right Quest hand scale** 滑桿邊看 Quest 骨架與 Sharpa 網格邊調整。滑桿範圍 `0.50–2.00`，預設讀取目前左右 Sharpa 設定（現在各為 `1.2`）；也可用 `--left-scale` 和 `--right-scale` 指定其他起始值。這個 preview 不連 ROS，也不送實體手命令。按 Ctrl+C 後終端會印出最終數值；若要永久修改，再填回對應的 robot 設定檔。若畫面中只有單一指節不合，應檢查關節與追蹤點對應，不要只靠整體比例修正。
 
   **不連 Quest 先看畫面：**在同一指令後加 `--demo`，程式會用動畫假手部資料顯示 Sharpa 網格、骨架和相同比例滑桿；按 Ctrl+C 結束。demo 模式保留原本的手部平滑。所有執行及 replay viewer 的追蹤標記點預設直徑現在都是 `0.006 m`，仍可用各自的 `human_keypoint_size` 設定覆寫。假手尺寸不能當成 Quest 的校正結果。若只想看 Sharpa 零位模型，不需要骨架與滑桿，則用 `env -u PYTHONPATH .venv/bin/python scripts/view_bimanual_initial.py --config configs/bimanual/sharpa_wave.yaml`。
 

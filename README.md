@@ -101,8 +101,9 @@ env -u PYTHONPATH .venv/bin/python scripts/preview_sharpa_scale.py
 Open `http://localhost:9219` and adjust the left and right hand scale sliders
 while moving both hands in Quest. Press Ctrl+C to print the final values; copy
 them to `human_hand_scale` in `configs/robots/sharpa_wave_left.yaml` and
-`configs/robots/sharpa_wave_right.yaml` after checking several poses. Use
-`--left-scale 1.3 --right-scale 1.3` to start the sliders at 1.3. This preview
+`configs/robots/sharpa_wave_right.yaml` after checking several poses. Both the
+hand-only and CRX+Sharpa modes now default to 1.2 for each hand. Use
+`--left-scale` and `--right-scale` to try another starting value. This preview
 does not publish ROS commands. Add `--demo` to inspect the viewer without Quest;
 synthetic hand size cannot calibrate real tracking.
 

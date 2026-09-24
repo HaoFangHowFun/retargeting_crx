@@ -48,8 +48,8 @@ env -u PYTHONPATH .venv/bin/python scripts/preview_sharpa_scale.py
 
 Open `http://localhost:9219` and adjust the **Left Quest hand scale** and
 **Right Quest hand scale** sliders. Each starts at its robot config's
-`human_hand_scale` (currently 1.0) and ranges from 0.50 to 2.00. Use
-`--left-scale 1.2 --right-scale 1.1` to start elsewhere. The sliders scale
+`human_hand_scale` (currently 1.2 on both hands) and ranges from 0.50 to 2.00. Use
+`--left-scale 1.1 --right-scale 1.3` to try other starting values. The sliders scale
 Quest wrist-local keypoints on subsequent frames; they do not resize the
 Sharpa URDF. This preview sends no ROS commands. On Ctrl+C, copy the printed
 values to `configs/robots/sharpa_wave_left.yaml` and

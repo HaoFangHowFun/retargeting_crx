@@ -33,6 +33,8 @@ def test_slider_changes_only_its_hand_keypoints():
               adb=None, serial=None, viewer=True, viewer_port=9219)
     source = SyntheticBimanualInput()
     flow, _ = build_flow(args, with_arms=False, source=source)
+    assert flow.pipeline.left_mapper.human_hand_scale == 1.2
+    assert flow.pipeline.right_mapper.human_hand_scale == 1.2
     controls = add_scale_controls(flow, NS(server=NS(gui=Gui())),
                                   left_scale=1.0, right_scale=1.0)
     sample = source.read()

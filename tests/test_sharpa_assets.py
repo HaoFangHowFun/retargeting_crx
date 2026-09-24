@@ -27,6 +27,7 @@ def test_local_model_and_profile(side, combined):
     adaptor = RobotAdaptor(model, list(robot.actuated_joints))
     size, arm = (28, 6) if combined else (22, 0)
     assert model.dof == size and profile.retargeting.arm_dof == arm
+    assert robot.human_hand_scale == 1.2
     assert tuple(robot.actuated_joints[arm:]) == sharpa_names(side)
     assert len(profile.target.link_pairs) == 15
     assert len(robot.benchmark.fingertips) == 5

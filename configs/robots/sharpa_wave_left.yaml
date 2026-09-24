@@ -89,7 +89,7 @@ visual_frame_names:
 - left_pinky_fingertip
 - left_retarget_wrist
 wrist_frame_name: left_retarget_wrist
-human_hand_scale: 1.0
+human_hand_scale: 1.2
 benchmark:
   wrist_link_name: left_retarget_wrist
   fingertips:
